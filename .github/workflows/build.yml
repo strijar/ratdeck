@@ -24,23 +24,34 @@ jobs:
       - name: Build firmware
         run: pio run -e ratdeck_915
 
-      - name: Create merged firmware binary
+      - name: Package firmware ZIP
         run: |
-          python3 -m esptool --chip esp32s3 merge_bin \
-            --flash_mode qio \
-            --flash_size 16MB \
-            --flash_freq 80m \
-            -o ratdeck-firmware.bin \
-            0x0000 .pio/build/ratdeck_915/bootloader.bin \
-            0x8000 .pio/build/ratdeck_915/partitions.bin \
-            0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
-            0x10000 .pio/build/ratdeck_915/firmware.bin
+          mkdir -p ratdeck-firmware
+          cp .pio/build/ratdeck_915/bootloader.bin ratdeck-firmware/
+          cp .pio/build/ratdeck_915/partitions.bin ratdeck-firmware/
+          cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin ratdeck-firmware/
+          cp .pio/build/ratdeck_915/firmware.bin ratdeck-firmware/
+          cat > ratdeck-firmware/manifest.json << 'MANIFEST'
+          {
+            "chipFamily": "ESP32-S3",
+            "flashSize": "16MB",
+            "flashMode": "qio",
+            "flashFreq": "80m",
+            "parts": [
+              { "path": "bootloader.bin", "offset": "0x0000" },
+              { "path": "partitions.bin", "offset": "0x8000" },
+              { "path": "boot_app0.bin", "offset": "0xe000" },
+              { "path": "firmware.bin", "offset": "0x10000" }
+            ]
+          }
+          MANIFEST
+          cd ratdeck-firmware && zip -r ../ratdeck-firmware.zip . && cd ..
 
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
           name: ratdeck-firmware
-          path: ratdeck-firmware.bin
+          path: ratdeck-firmware.zip
 
   release:
     needs: build
@@ -62,20 +73,31 @@ jobs:
       - name: Build firmware
         run: pio run -e ratdeck_915
 
-      - name: Create merged firmware binary
+      - name: Package firmware ZIP
         run: |
-          python3 -m esptool --chip esp32s3 merge_bin \
-            --flash_mode qio \
-            --flash_size 16MB \
-            --flash_freq 80m \
-            -o ratdeck-firmware.bin \
-            0x0000 .pio/build/ratdeck_915/bootloader.bin \
-            0x8000 .pio/build/ratdeck_915/partitions.bin \
-            0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
-            0x10000 .pio/build/ratdeck_915/firmware.bin
+          mkdir -p ratdeck-firmware
+          cp .pio/build/ratdeck_915/bootloader.bin ratdeck-firmware/
+          cp .pio/build/ratdeck_915/partitions.bin ratdeck-firmware/
+          cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin ratdeck-firmware/
+          cp .pio/build/ratdeck_915/firmware.bin ratdeck-firmware/
+          cat > ratdeck-firmware/manifest.json << 'MANIFEST'
+          {
+            "chipFamily": "ESP32-S3",
+            "flashSize": "16MB",
+            "flashMode": "qio",
+            "flashFreq": "80m",
+            "parts": [
+              { "path": "bootloader.bin", "offset": "0x0000" },
+              { "path": "partitions.bin", "offset": "0x8000" },
+              { "path": "boot_app0.bin", "offset": "0xe000" },
+              { "path": "firmware.bin", "offset": "0x10000" }
+            ]
+          }
+          MANIFEST
+          cd ratdeck-firmware && zip -r ../ratdeck-firmware.zip . && cd ..
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ratdeck-firmware.bin
+          files: ratdeck-firmware.zip
           generate_release_notes: true
