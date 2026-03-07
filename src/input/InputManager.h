@@ -15,6 +15,12 @@ public:
 
     // Any activity (for power wake)
     bool hadActivity() const { return _activity; }
+    // Strong activity = keyboard/touch (wakes from screen off)
+    // Weak activity = trackball only (wakes from dim, NOT from screen off)
+    bool hadStrongActivity() const { return _strongActivity; }
+
+    // Long-press: trackball click held for >= threshold
+    bool hadLongPress() const { return _longPress; }
 
 private:
     Keyboard* _kb = nullptr;
@@ -24,6 +30,14 @@ private:
     bool _hasKey = false;
     KeyEvent _keyEvent;
     bool _activity = false;
+    bool _strongActivity = false;
+    bool _longPress = false;
+    bool _clickPending = false;
+    bool _longPressFired = false;
+    unsigned long _clickStartMs = 0;
+    unsigned long _lastClickDownMs = 0;
+    static constexpr unsigned long LONG_PRESS_MS = 1200;
+    static constexpr unsigned long CLICK_DEBOUNCE_MS = 80;
 
     // Trackball navigation state
     int8_t _tbAccumX = 0;
@@ -31,4 +45,8 @@ private:
     unsigned long _lastTbNavTime = 0;
     static constexpr int8_t TB_NAV_THRESHOLD = 3;
     static constexpr unsigned long TB_NAV_RATE_MS = 200;
+
+    // Touch polling throttle
+    unsigned long _lastTouchPoll = 0;
+    static constexpr unsigned long TOUCH_POLL_MS = 20;  // ~50Hz
 };

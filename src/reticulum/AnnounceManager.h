@@ -5,6 +5,7 @@
 #include <Bytes.h>
 #include <vector>
 #include <string>
+#include <map>
 
 class SDStore;
 class FlashStore;
@@ -34,6 +35,12 @@ public:
     void setLocalDestHash(const RNS::Bytes& hash) { _localDestHash = hash; }
     void saveContacts();
     void loadContacts();
+    void loop();  // Call from main loop — handles deferred saves
+
+    // Name cache: persists hash→name mappings so names survive reboots
+    std::string lookupName(const std::string& hexHash) const;
+    void saveNameCache();
+    void loadNameCache();
 
     const std::vector<DiscoveredNode>& nodes() const { return _nodes; }
     int nodeCount() const { return _nodes.size(); }
@@ -41,6 +48,7 @@ public:
     const DiscoveredNode* findNodeByHex(const std::string& hexHash) const;
     void addManualContact(const std::string& hexHash, const std::string& name);
     void evictStale(unsigned long maxAgeMs = 3600000);
+    void clearTransientNodes();
 
 private:
     void saveContact(const DiscoveredNode& node);
@@ -50,5 +58,12 @@ private:
     SDStore* _sd = nullptr;
     FlashStore* _flash = nullptr;
     RNS::Bytes _localDestHash;
-    static constexpr int MAX_NODES = 200;  // PSRAM allows more
+    bool _contactsDirty = false;
+    bool _nameCacheDirty = false;
+    unsigned long _lastContactSave = 0;
+    unsigned long _lastAnnounceProcessed = 0;
+    std::map<std::string, std::string> _nameCache;  // hexHash → displayName
+    static constexpr int MAX_NODES = 30;
+    static constexpr unsigned long CONTACT_SAVE_INTERVAL_MS = 30000;
+    static constexpr unsigned long ANNOUNCE_MIN_INTERVAL_MS = 200;  // Rate-limit announce processing
 };

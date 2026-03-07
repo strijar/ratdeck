@@ -58,17 +58,30 @@ void AnnounceManager::received_announce(
     // Filter out own announces
     if (_localDestHash.size() > 0 && destination_hash == _localDestHash) return;
 
-    Serial.printf("[ANNOUNCE] From: %s name=\"%s\"\n", destination_hash.toHex().c_str(), name.c_str());
+    std::string destHex = destination_hash.toHex();
+    Serial.printf("[ANNOUNCE] From: %s name=\"%s\"\n", destHex.c_str(), name.c_str());
+
+    // Update name cache for persistence across reboots
+    if (!name.empty()) {
+        auto it = _nameCache.find(destHex);
+        if (it == _nameCache.end() || it->second != name) {
+            _nameCache[destHex] = name;
+            _nameCacheDirty = true;
+        }
+    }
 
     std::string idHex = announced_identity.hexhash();
 
+    unsigned long now = millis();
     for (auto& node : _nodes) {
         if (node.hash == destination_hash) {
+            // Rate-limit updates for existing nodes
+            if (now - node.lastSeen < ANNOUNCE_MIN_INTERVAL_MS) return;
             if (!name.empty()) node.name = name;
             if (!idHex.empty()) node.identityHex = idHex;
-            node.lastSeen = millis();
+            node.lastSeen = now;
             node.hops = RNS::Transport::hops_to(destination_hash);
-            if (node.saved) saveContact(node);
+            if (node.saved) _contactsDirty = true;
             return;
         }
     }
@@ -98,13 +111,29 @@ void AnnounceManager::received_announce(
     _nodes.push_back(node);
 }
 
+void AnnounceManager::loop() {
+    unsigned long now = millis();
+    if (_contactsDirty && now - _lastContactSave >= CONTACT_SAVE_INTERVAL_MS) {
+        _contactsDirty = false;
+        _lastContactSave = now;
+        saveContacts();
+        Serial.println("[ANNOUNCE] Deferred contact save complete");
+    }
+    if (_nameCacheDirty && now - _lastContactSave >= CONTACT_SAVE_INTERVAL_MS) {
+        _nameCacheDirty = false;
+        saveNameCache();
+    }
+}
+
 const DiscoveredNode* AnnounceManager::findNode(const RNS::Bytes& hash) const {
     for (const auto& n : _nodes) { if (n.hash == hash) return &n; }
     return nullptr;
 }
 
 const DiscoveredNode* AnnounceManager::findNodeByHex(const std::string& hexHash) const {
-    for (const auto& n : _nodes) { if (n.hash.toHex() == hexHash) return &n; }
+    RNS::Bytes target;
+    target.assignHex(hexHash.c_str());
+    for (const auto& n : _nodes) { if (n.hash == target) return &n; }
     return nullptr;
 }
 
@@ -135,6 +164,16 @@ void AnnounceManager::evictStale(unsigned long maxAgeMs) {
         [now, maxAgeMs](const DiscoveredNode& n) {
             return !n.saved && (now - n.lastSeen > maxAgeMs);
         }), _nodes.end());
+}
+
+void AnnounceManager::clearTransientNodes() {
+    int before = _nodes.size();
+    _nodes.erase(std::remove_if(_nodes.begin(), _nodes.end(),
+        [](const DiscoveredNode& n) { return !n.saved; }), _nodes.end());
+    int removed = before - (int)_nodes.size();
+    if (removed > 0) {
+        Serial.printf("[ANNOUNCE] Cleared %d transient nodes\n", removed);
+    }
 }
 
 void AnnounceManager::saveContact(const DiscoveredNode& node) {
@@ -201,4 +240,47 @@ void AnnounceManager::loadContacts() {
 
 void AnnounceManager::saveContacts() {
     for (const auto& n : _nodes) { if (n.saved) saveContact(n); }
+}
+
+std::string AnnounceManager::lookupName(const std::string& hexHash) const {
+    // Check live nodes first
+    const DiscoveredNode* node = findNodeByHex(hexHash);
+    if (node && !node->name.empty()) return node->name;
+    // Fall back to cached names
+    auto it = _nameCache.find(hexHash);
+    if (it != _nameCache.end()) return it->second;
+    return "";
+}
+
+void AnnounceManager::saveNameCache() {
+    JsonDocument doc;
+    for (auto& kv : _nameCache) {
+        doc[kv.first] = kv.second;
+    }
+    String json;
+    serializeJson(doc, json);
+    if (_sd && _sd->isReady()) {
+        _sd->writeString("/ratputer/config/names.json", json);
+    }
+    if (_flash) {
+        _flash->writeString("/config/names.json", json);
+    }
+    Serial.printf("[ANNOUNCE] Name cache saved (%d entries)\n", (int)_nameCache.size());
+}
+
+void AnnounceManager::loadNameCache() {
+    String json;
+    if (_sd && _sd->isReady()) {
+        json = _sd->readString("/ratputer/config/names.json");
+    }
+    if (json.isEmpty() && _flash) {
+        json = _flash->readString("/config/names.json");
+    }
+    if (json.isEmpty()) return;
+    JsonDocument doc;
+    if (deserializeJson(doc, json)) return;
+    for (JsonPair kv : doc.as<JsonObject>()) {
+        _nameCache[kv.key().c_str()] = kv.value().as<std::string>();
+    }
+    Serial.printf("[ANNOUNCE] Name cache loaded (%d entries)\n", (int)_nameCache.size());
 }

@@ -37,6 +37,13 @@ int Power::batteryPercent() const {
     return (int)((v - 3.0f) / 1.2f * 100.0f);
 }
 
+uint8_t Power::percentToPWM(uint8_t pct) const {
+    if (pct == 0) return 0;
+    if (pct >= 100) return 255;
+    // Map 1-100 to ~6-255 (minimum visible PWM ~6)
+    return (uint8_t)(6 + (uint16_t)(pct - 1) * 249 / 99);
+}
+
 void Power::activity() {
     _lastActivity = millis();
     if (_state != ACTIVE) {
@@ -44,10 +51,18 @@ void Power::activity() {
     }
 }
 
-void Power::setBrightness(uint8_t brightness) {
-    _fullBrightness = brightness;
+void Power::weakActivity() {
+    _lastActivity = millis();
+    // Trackball wakes from DIM but not from SCREEN_OFF
+    if (_state == DIMMED) {
+        setState(ACTIVE);
+    }
+}
+
+void Power::setBrightness(uint8_t percent) {
+    _brightnessPct = constrain(percent, 1, 100);
     if (_state == ACTIVE) {
-        display.setBrightness(_fullBrightness);
+        display.setBrightness(percentToPWM(_brightnessPct));
     }
 }
 
@@ -76,15 +91,18 @@ void Power::loop() {
 
 void Power::setState(State newState) {
     if (newState == _state) return;
+    State oldState = _state;
     _state = newState;
 
     switch (_state) {
         case ACTIVE:
-            display.wakeup();
-            display.setBrightness(_fullBrightness);
+            if (oldState == SCREEN_OFF) {
+                display.wakeup();
+            }
+            display.setBrightness(percentToPWM(_brightnessPct));
             break;
         case DIMMED:
-            display.setBrightness(DIM_BRIGHTNESS);
+            display.setBrightness(DIM_PWM);
             break;
         case SCREEN_OFF:
             display.setBrightness(0);

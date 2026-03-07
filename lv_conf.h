@@ -6,6 +6,10 @@
 // Color depth: 16-bit RGB565
 #define LV_COLOR_DEPTH 16
 
+// CRITICAL: Byte-swap for LovyanGFX + ST7789V
+// Without this, colors appear pixelated/glitchy
+#define LV_COLOR_16_SWAP 1
+
 // Memory: use stdlib malloc (PSRAM-aware on ESP32-S3)
 #define LV_MEM_CUSTOM 1
 #define LV_MEM_CUSTOM_INCLUDE <stdlib.h>
@@ -23,16 +27,22 @@
 #define LV_VER_RES_MAX 240
 #define LV_DPI_DEF 130
 
-// Logging
-#define LV_USE_LOG 0
+// Logging (enabled temporarily for debug)
+#define LV_USE_LOG 1
+#define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
+#define LV_LOG_PRINTF 1
+
+// Theme
+#define LV_USE_THEME_DEFAULT 1
+#define LV_THEME_DEFAULT_DARK 1
 
 // Fonts - built-in
-#define LV_FONT_MONTSERRAT_8  1
 #define LV_FONT_MONTSERRAT_10 1
 #define LV_FONT_MONTSERRAT_12 1
 #define LV_FONT_MONTSERRAT_14 1
+#define LV_FONT_MONTSERRAT_16 1
 #define LV_FONT_UNSCII_8      1
-#define LV_FONT_DEFAULT        &lv_font_montserrat_12
+#define LV_FONT_DEFAULT        &lv_font_montserrat_14
 
 // Widgets
 #define LV_USE_LABEL      1
@@ -53,10 +63,15 @@
 #define LV_USE_SPINNER    1
 #define LV_USE_MSGBOX     1
 #define LV_USE_KEYBOARD   1
+#define LV_USE_CHECKBOX   1
+#define LV_USE_CANVAS     0
 
-// Scroll
+// Layouts
 #define LV_USE_FLEX 1
 #define LV_USE_GRID 1
+
+// Animations
+#define LV_USE_ANIMIMG 0
 
 // OS
 #define LV_USE_OS LV_OS_NONE

@@ -38,7 +38,7 @@ struct UserSettings {
     // Display
     uint16_t screenDimTimeout = 30;   // seconds
     uint16_t screenOffTimeout = 60;   // seconds
-    uint8_t brightness = 255;
+    uint8_t brightness = 100;  // Percentage 1-100
     bool denseFontMode = false;       // T-Deck Plus: adaptive font toggle
 
     // Trackball

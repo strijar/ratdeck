@@ -6,6 +6,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
+#include <lvgl.h>
 
 #include "config/BoardConfig.h"
 #include "config/Config.h"
@@ -18,6 +19,8 @@
 #include "input/InputManager.h"
 #include "input/HotkeyManager.h"
 #include "ui/UIManager.h"
+#include "ui/LvTabBar.h"
+#include "ui/LvInput.h"
 #include "ui/screens/BootScreen.h"
 #include "ui/screens/HomeScreen.h"
 #include "ui/screens/NodesScreen.h"
@@ -25,8 +28,17 @@
 #include "ui/screens/MessageView.h"
 #include "ui/screens/SettingsScreen.h"
 #include "ui/screens/HelpOverlay.h"
-#include "ui/screens/MapScreen.h"
+// MapScreen removed
 #include "ui/screens/NameInputScreen.h"
+#include "ui/screens/LvBootScreen.h"
+#include "ui/screens/LvHomeScreen.h"
+#include "ui/screens/LvNodesScreen.h"
+#include "ui/screens/LvMessagesScreen.h"
+#include "ui/screens/LvMessageView.h"
+#include "ui/screens/LvSettingsScreen.h"
+#include "ui/screens/LvHelpOverlay.h"
+// Map screen removed
+#include "ui/screens/LvNameInputScreen.h"
 #include "storage/FlashStore.h"
 #include "storage/SDStore.h"
 #include "storage/MessageStore.h"
@@ -85,7 +97,7 @@ Power powerMgr;
 AudioNotify audio;
 IdentityManager identityMgr;
 
-// --- Screens ---
+// --- Legacy Screens (kept for fallback during migration) ---
 BootScreen bootScreen;
 HomeScreen homeScreen;
 NodesScreen nodesScreen;
@@ -93,11 +105,25 @@ MessagesScreen messagesScreen;
 MessageView messageView;
 SettingsScreen settingsScreen;
 HelpOverlay helpOverlay;
-MapScreen mapScreen;
+// MapScreen removed
 NameInputScreen nameInputScreen;
 
-// Tab-screen mapping (5 tabs)
-Screen* tabScreens[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+// --- LVGL Screens ---
+LvBootScreen lvBootScreen;
+LvHomeScreen lvHomeScreen;
+LvNodesScreen lvNodesScreen;
+LvMessagesScreen lvMessagesScreen;
+LvMessageView lvMessageView;
+LvSettingsScreen lvSettingsScreen;
+LvHelpOverlay lvHelpOverlay;
+// LvMapScreen removed
+LvNameInputScreen lvNameInputScreen;
+
+// Tab-screen mapping (4 tabs) — LVGL versions
+LvScreen* lvTabScreens[LvTabBar::TAB_COUNT] = {};
+
+// Legacy tab mapping (kept for reference)
+Screen* tabScreens[LvTabBar::TAB_COUNT] = {};
 
 // --- State ---
 bool radioOnline = false;
@@ -105,7 +131,6 @@ bool bootComplete = false;
 bool bootLoopRecovery = false;
 bool wifiSTAStarted = false;
 bool wifiSTAConnected = false;
-bool tcpClientsCreated = false;
 unsigned long lastAutoAnnounce = 0;
 unsigned long lastStatusUpdate = 0;
 constexpr unsigned long ANNOUNCE_INTERVAL_MS = 5 * 60 * 1000;  // 5 minutes
@@ -135,7 +160,40 @@ static void announceWithName() {
     rns.announce(appData);
     ui.statusBar().flashAnnounce();
     ui.statusBar().showToast("Announce sent!");
+    ui.lvStatusBar().flashAnnounce();
+    ui.lvStatusBar().showToast("Announce sent!");
     Serial.println("[ANNOUNCE] Sent with display name");
+}
+
+// =============================================================================
+// TCP client management — stop old clients, create new from config
+// =============================================================================
+
+static void reloadTCPClients() {
+    // Stop existing clients (don't delete — Transport holds interface references)
+    for (auto* tcp : tcpClients) tcp->stop();
+    tcpClients.clear();
+
+    // Create new clients from current config
+    if (WiFi.status() == WL_CONNECTED) {
+        for (auto& ep : userConfig.settings().tcpConnections) {
+            if (ep.autoConnect && !ep.host.isEmpty()) {
+                char name[32];
+                snprintf(name, sizeof(name), "TCP.%s", ep.host.c_str());
+                auto* tcp = new TCPClientInterface(ep.host.c_str(), ep.port, name);
+                tcpIfaces.emplace_back(tcp);
+                tcpIfaces.back().mode(RNS::Type::Interface::MODE_GATEWAY);
+                RNS::Transport::register_interface(tcpIfaces.back());
+                tcp->start();
+                tcpClients.push_back(tcp);
+                Serial.printf("[TCP] Created client: %s:%d\n", ep.host.c_str(), ep.port);
+            }
+        }
+    }
+
+    if (tcpClients.empty()) {
+        Serial.println("[TCP] No active TCP connections");
+    }
 }
 
 // =============================================================================
@@ -143,20 +201,19 @@ static void announceWithName() {
 // =============================================================================
 
 void onHotkeyHelp() {
-    helpOverlay.toggle();
-    ui.setOverlay(helpOverlay.isVisible() ? &helpOverlay : nullptr);
+    lvHelpOverlay.toggle();
 }
 void onHotkeyMessages() {
-    ui.tabBar().setActiveTab(TabBar::TAB_MSGS);
-    ui.setScreen(&messagesScreen);
+    ui.lvTabBar().setActiveTab(LvTabBar::TAB_MSGS);
+    ui.setLvScreen(&lvMessagesScreen);
 }
 void onHotkeyNewMsg() {
-    ui.tabBar().setActiveTab(TabBar::TAB_MSGS);
-    ui.setScreen(&messagesScreen);
+    ui.lvTabBar().setActiveTab(LvTabBar::TAB_MSGS);
+    ui.setLvScreen(&lvMessagesScreen);
 }
 void onHotkeySettings() {
-    ui.tabBar().setActiveTab(TabBar::TAB_SETUP);
-    ui.setScreen(&settingsScreen);
+    ui.lvTabBar().setActiveTab(LvTabBar::TAB_SETUP);
+    ui.setLvScreen(&lvSettingsScreen);
 }
 void onHotkeyAnnounce() {
     announceWithName();
@@ -225,7 +282,8 @@ void onHotkeyRadioTest() {
 // Helper: render boot screen immediately
 // =============================================================================
 static void bootRender() {
-    ui.render();
+    // LVGL boot screen calls lv_timer_handler() internally via setProgress()
+    // Legacy render kept as fallback
 }
 
 // =============================================================================
@@ -320,6 +378,10 @@ void setup() {
     display.begin();
     Serial.println("[BOOT] Display initialized (LovyanGFX direct)");
 
+    // Step 5.5: Initialize LVGL display driver
+    display.beginLVGL();
+    Serial.println("[BOOT] LVGL initialized");
+
     // Verify radio SPI survives display init
     if (radioOnline) {
         uint8_t sw_msb = radio.readRegister(0x0740);
@@ -328,33 +390,37 @@ void setup() {
             sw_msb, sw_lsb, (sw_msb == 0xFF && sw_lsb == 0xFF) ? "DEAD!" : "OK");
     }
 
-    // Step 6: UI manager
+    // Step 6: UI manager (initializes both legacy and LVGL UI layers)
     ui.begin(&display.gfx());
     ui.setBootMode(true);
-    ui.setScreen(&bootScreen);
+    ui.setLvScreen(&lvBootScreen);
     ui.statusBar().setLoRaOnline(radioOnline);
-    bootScreen.setProgress(0.45f, radioOnline ? "Radio online" : "Radio FAILED");
-    bootRender();
+    ui.lvStatusBar().setLoRaOnline(radioOnline);
+    lvBootScreen.setProgress(0.45f, radioOnline ? "Radio online" : "Radio FAILED");
 
     // Step 7: Touch HAL — GT911 I2C
     touch.begin();
-    bootScreen.setProgress(0.50f, "Touch ready");
-    bootRender();
+    lvBootScreen.setProgress(0.50f, "Touch ready");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
 
     // Step 8: Keyboard HAL — ESP32-C3 I2C
     keyboard.begin();
-    bootScreen.setProgress(0.52f, "Keyboard ready");
-    bootRender();
+    lvBootScreen.setProgress(0.52f, "Keyboard ready");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
 
     // Step 9: Trackball HAL — GPIO interrupts
     trackball.begin();
-    bootScreen.setProgress(0.54f, "Trackball ready");
-    bootRender();
+    lvBootScreen.setProgress(0.54f, "Trackball ready");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
 
     // Step 10: Input manager
     inputManager.begin(&keyboard, &trackball, &touch);
-    bootScreen.setProgress(0.55f, "Input ready");
-    bootRender();
+
+    // Step 10.5: LVGL input drivers
+    LvInput::init(&keyboard, &trackball, &touch);
+
+    lvBootScreen.setProgress(0.55f, "Input ready");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
 
     // Step 11: Register hotkeys
     hotkeys.registerHotkey('h', "Help", onHotkeyHelp);
@@ -366,16 +432,16 @@ void setup() {
     hotkeys.registerHotkey('t', "Radio Test", onHotkeyRadioTest);
     hotkeys.registerHotkey('r', "RSSI Monitor", onHotkeyRssiMonitor);
     hotkeys.setTabCycleCallback([](int dir) {
-        ui.tabBar().cycleTab(dir);
-        int tab = ui.tabBar().getActiveTab();
-        if (tabScreens[tab]) ui.setScreen(tabScreens[tab]);
+        ui.lvTabBar().cycleTab(dir);
+        int tab = ui.lvTabBar().getActiveTab();
+        if (lvTabScreens[tab]) ui.setLvScreen(lvTabScreens[tab]);
     });
-    bootScreen.setProgress(0.58f, "Hotkeys registered");
-    bootRender();
+    lvBootScreen.setProgress(0.58f, "Hotkeys registered");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
 
     // Step 12: Mount LittleFS
-    bootScreen.setProgress(0.60f, "Mounting flash...");
-    bootRender();
+    lvBootScreen.setProgress(0.60f, "Mounting flash...");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
     if (!flash.begin()) {
         Serial.println("[BOOT] Flash init failed, formatting...");
         if (flash.format()) {
@@ -401,8 +467,8 @@ void setup() {
         }
     }
 
-    bootScreen.setProgress(0.65f, "Starting Reticulum...");
-    bootRender();
+    lvBootScreen.setProgress(0.65f, "Starting Reticulum...");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
     rns.setSDStore(&sdStore);
     // Transport mode is loaded later from config; default is endpoint (no rebroadcast)
     // We load a quick peek at the config to get the transport setting before RNS init
@@ -420,19 +486,19 @@ void setup() {
     }
     if (rns.begin(&radio, &flash)) {
         Serial.printf("[BOOT] Identity: %s\n", rns.identityHash().c_str());
-        bootScreen.setProgress(0.72f, "Reticulum active");
+        lvBootScreen.setProgress(0.72f, "Reticulum active");
     } else {
         Serial.println("[BOOT] Reticulum init failed!");
-        bootScreen.setProgress(0.72f, "RNS: FAILED");
+        lvBootScreen.setProgress(0.72f, "RNS: FAILED");
     }
-    bootRender();
+    // (LVGL boot renders via lv_timer_handler in setProgress)
 
     // Step 15.5: Identity manager
     identityMgr.begin(&flash, &sdStore);
 
     // Step 16: Message store
-    bootScreen.setProgress(0.72f, "Starting messaging...");
-    bootRender();
+    lvBootScreen.setProgress(0.72f, "Starting messaging...");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
     messageStore.begin(&flash, &sdStore);
 
     // Step 17: LXMF init
@@ -440,24 +506,28 @@ void setup() {
     lxmf.setMessageCallback([](const LXMFMessage& msg) {
         Serial.printf("[LXMF] Message from %s\n", msg.sourceHash.toHex().substr(0, 8).c_str());
         ui.tabBar().setUnreadCount(TabBar::TAB_MSGS, lxmf.unreadCount());
+        ui.lvTabBar().setUnreadCount(LvTabBar::TAB_MSGS, lxmf.unreadCount());
         audio.playMessage();
     });
-    bootScreen.setProgress(0.75f, "LXMF ready");
-    bootRender();
+    // Pre-cache unread counts so first tab switch to Messages is instant
+    lxmf.unreadCount();
+    lvBootScreen.setProgress(0.75f, "LXMF ready");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
 
     // Step 18: Announce manager
-    bootScreen.setProgress(0.78f, "Loading contacts...");
-    bootRender();
+    lvBootScreen.setProgress(0.78f, "Loading contacts...");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
     announceManager = new AnnounceManager();
     announceManager->setStorage(&sdStore, &flash);
     announceManager->setLocalDestHash(rns.destination().hash());
     announceManager->loadContacts();
+    announceManager->loadNameCache();
     announceHandler = RNS::HAnnounceHandler(announceManager);
     RNS::Transport::register_announce_handler(announceHandler);
 
     // Step 19: User config load
-    bootScreen.setProgress(0.82f, "Loading config...");
-    bootRender();
+    lvBootScreen.setProgress(0.82f, "Loading config...");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
     userConfig.load(sdStore, flash);
 
     // Step 20: Boot loop recovery
@@ -465,8 +535,8 @@ void setup() {
         userConfig.settings().wifiMode = RAT_WIFI_OFF;
         Serial.println("[BOOT] WiFi forced OFF (boot loop recovery)");
     }
-    bootScreen.setProgress(0.83f, "Config loaded");
-    bootRender();
+    lvBootScreen.setProgress(0.83f, "Config loaded");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
 
     // Step 21: Apply radio config
     if (radioOnline) {
@@ -482,14 +552,15 @@ void setup() {
                       (unsigned long)s.loraFrequency, s.loraSF,
                       (unsigned long)s.loraBW, s.loraCR, s.loraTxPower, s.loraPreamble);
     }
-    bootScreen.setProgress(0.84f, "Radio configured");
-    bootRender();
+    lvBootScreen.setProgress(0.84f, "Radio configured");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
 
     // Step 22: WiFi start
     RatWiFiMode wifiMode = userConfig.settings().wifiMode;
+    ui.lvStatusBar().setWiFiEnabled(wifiMode != RAT_WIFI_OFF);
     if (wifiMode == RAT_WIFI_AP) {
-        bootScreen.setProgress(0.87f, "Starting WiFi AP...");
-        bootRender();
+        lvBootScreen.setProgress(0.87f, "Starting WiFi AP...");
+        // (LVGL boot renders via lv_timer_handler in setProgress)
         wifiImpl = new WiFiInterface("WiFi.AP");
         if (!userConfig.settings().wifiAPSSID.isEmpty()) {
             wifiImpl->setAPCredentials(
@@ -501,9 +572,10 @@ void setup() {
         RNS::Transport::register_interface(wifiIface);
         wifiImpl->start();
         ui.statusBar().setWiFiActive(true);
+        ui.lvStatusBar().setWiFiActive(true);
     } else if (wifiMode == RAT_WIFI_STA) {
-        bootScreen.setProgress(0.87f, "WiFi STA starting...");
-        bootRender();
+        lvBootScreen.setProgress(0.87f, "WiFi STA starting...");
+        // WiFi is enabled but not yet connected — indicator will be yellow
         if (!userConfig.settings().wifiSTASSID.isEmpty()) {
             WiFi.mode(WIFI_STA);
             WiFi.setAutoReconnect(true);
@@ -513,13 +585,14 @@ void setup() {
             Serial.printf("[WIFI] STA: %s\n", userConfig.settings().wifiSTASSID.c_str());
         }
     } else {
-        bootScreen.setProgress(0.87f, "WiFi disabled");
-        bootRender();
+        lvBootScreen.setProgress(0.87f, "WiFi disabled");
+        // (LVGL boot renders via lv_timer_handler in setProgress)
     }
 
     // Step 23: BLE start
-    bootScreen.setProgress(0.90f, "BLE...");
-    bootRender();
+    lvBootScreen.setProgress(0.90f, "BLE...");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
+    ui.lvStatusBar().setBLEEnabled(userConfig.settings().bleEnabled);
     if (userConfig.settings().bleEnabled) {
         bleInterface.setSideband(&bleSideband);
 
@@ -535,6 +608,7 @@ void setup() {
             });
 
             ui.statusBar().setBLEActive(true);
+            ui.lvStatusBar().setBLEActive(true);
             Serial.println("[BLE] Transport + Sideband ready");
         }
     } else {
@@ -542,115 +616,139 @@ void setup() {
     }
 
     // Step 24: Power manager
-    bootScreen.setProgress(0.92f, "Power manager...");
-    bootRender();
+    lvBootScreen.setProgress(0.92f, "Power manager...");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
     powerMgr.begin();
     powerMgr.setDimTimeout(userConfig.settings().screenDimTimeout);
     powerMgr.setOffTimeout(userConfig.settings().screenOffTimeout);
     powerMgr.setBrightness(userConfig.settings().brightness);
 
     // Step 25: Audio init
-    bootScreen.setProgress(0.94f, "Audio...");
-    bootRender();
+    lvBootScreen.setProgress(0.94f, "Audio...");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
     audio.setEnabled(userConfig.settings().audioEnabled);
     audio.setVolume(userConfig.settings().audioVolume);
     audio.begin();
 
     // Boot complete — transition to Home screen
     delay(200);
-    bootScreen.setProgress(1.0f, "Ready");
-    bootRender();
+    lvBootScreen.setProgress(1.0f, "Ready");
+    // (LVGL boot renders via lv_timer_handler in setProgress)
     audio.playBoot();
     delay(400);
 
     bootComplete = true;
     ui.statusBar().setTransportMode("Ratdeck");
+    ui.lvStatusBar().setTransportMode("Ratdeck");
 
-    // Wire up screen dependencies
-    homeScreen.setReticulumManager(&rns);
-    homeScreen.setRadio(&radio);
-    homeScreen.setUserConfig(&userConfig);
-    homeScreen.setAnnounceCallback([]() {
+    // Keep UI alive during blocking radio TX (endPacket wait loop)
+    // Re-entrancy guard prevents nested lv_timer_handler() calls
+    radio.setYieldCallback([]() {
+        static bool inYield = false;
+        if (inYield) return;
+        inYield = true;
+        powerMgr.activity();  // Keep screen alive during TX
+        if (powerMgr.isScreenOn()) {
+            lv_timer_handler();
+        }
+        inYield = false;
+    });
+
+    // Wire up LVGL screen dependencies
+    lvHomeScreen.setReticulumManager(&rns);
+    lvHomeScreen.setRadio(&radio);
+    lvHomeScreen.setUserConfig(&userConfig);
+    lvHomeScreen.setAnnounceCallback([]() {
         announceWithName();
     });
 
-    nodesScreen.setAnnounceManager(announceManager);
-    nodesScreen.setNodeSelectedCallback([](const std::string& peerHex) {
-        messageView.setPeerHex(peerHex);
-        ui.tabBar().setActiveTab(TabBar::TAB_MSGS);
-        ui.setScreen(&messageView);
+    lvNodesScreen.setAnnounceManager(announceManager);
+    lvNodesScreen.setUIManager(&ui);
+    lvNodesScreen.setNodeSelectedCallback([](const std::string& peerHex) {
+        lvMessageView.setPeerHex(peerHex);
+        ui.lvTabBar().setActiveTab(LvTabBar::TAB_MSGS);
+        ui.setLvScreen(&lvMessageView);
     });
 
-    messagesScreen.setLXMFManager(&lxmf);
-    messagesScreen.setAnnounceManager(announceManager);
-    messagesScreen.setOpenCallback([](const std::string& peerHex) {
-        messageView.setPeerHex(peerHex);
-        ui.setScreen(&messageView);
+    lvMessagesScreen.setLXMFManager(&lxmf);
+    lvMessagesScreen.setAnnounceManager(announceManager);
+    lvMessagesScreen.setUIManager(&ui);
+    lvMessagesScreen.setOpenCallback([](const std::string& peerHex) {
+        lvMessageView.setPeerHex(peerHex);
+        ui.setLvScreen(&lvMessageView);
     });
 
-    messageView.setLXMFManager(&lxmf);
-    messageView.setAnnounceManager(announceManager);
-    messageView.setBackCallback([]() {
-        ui.setScreen(&messagesScreen);
+    lvMessageView.setLXMFManager(&lxmf);
+    lvMessageView.setAnnounceManager(announceManager);
+    lvMessageView.setBackCallback([]() {
+        ui.setLvScreen(&lvMessagesScreen);
     });
 
-    settingsScreen.setUserConfig(&userConfig);
-    settingsScreen.setFlashStore(&flash);
-    settingsScreen.setSDStore(&sdStore);
-    settingsScreen.setRadio(&radio);
-    settingsScreen.setAudio(&audio);
-    settingsScreen.setPower(&powerMgr);
-    settingsScreen.setWiFi(wifiImpl);
-    settingsScreen.setTCPClients(&tcpClients);
-    settingsScreen.setRNS(&rns);
-    settingsScreen.setIdentityManager(&identityMgr);
-    settingsScreen.setUIManager(&ui);
-    settingsScreen.setIdentityHash(rns.identityHash());
-    settingsScreen.setSaveCallback([]() -> bool {
+    lvSettingsScreen.setUserConfig(&userConfig);
+    lvSettingsScreen.setFlashStore(&flash);
+    lvSettingsScreen.setSDStore(&sdStore);
+    lvSettingsScreen.setRadio(&radio);
+    lvSettingsScreen.setAudio(&audio);
+    lvSettingsScreen.setPower(&powerMgr);
+    lvSettingsScreen.setWiFi(wifiImpl);
+    lvSettingsScreen.setTCPClients(&tcpClients);
+    lvSettingsScreen.setRNS(&rns);
+    lvSettingsScreen.setIdentityManager(&identityMgr);
+    lvSettingsScreen.setUIManager(&ui);
+    lvSettingsScreen.setIdentityHash(rns.identityHash());
+    lvSettingsScreen.setSaveCallback([]() -> bool {
         bool ok = userConfig.save(sdStore, flash);
         Serial.printf("[CONFIG] Save %s\n", ok ? "OK" : "FAILED");
         return ok;
     });
+    lvSettingsScreen.setTCPChangeCallback([]() {
+        Serial.println("[TCP] Settings changed, reloading...");
+        reloadTCPClients();
+        if (announceManager) announceManager->clearTransientNodes();
+    });
 
-    // Tab bar callbacks
-    tabScreens[TabBar::TAB_HOME]  = &homeScreen;
-    tabScreens[TabBar::TAB_MSGS]  = &messagesScreen;
-    tabScreens[TabBar::TAB_NODES] = &nodesScreen;
-    tabScreens[TabBar::TAB_MAP]   = &mapScreen;
-    tabScreens[TabBar::TAB_SETUP] = &settingsScreen;
+    // LVGL help overlay
+    lvHelpOverlay.create();
 
-    ui.tabBar().setTabCallback([](int tab) {
-        if (tabScreens[tab]) ui.setScreen(tabScreens[tab]);
+    // Tab bar callbacks — LVGL
+    lvTabScreens[LvTabBar::TAB_HOME]  = &lvHomeScreen;
+    lvTabScreens[LvTabBar::TAB_MSGS]  = &lvMessagesScreen;
+    lvTabScreens[LvTabBar::TAB_NODES] = &lvNodesScreen;
+    lvTabScreens[LvTabBar::TAB_SETUP] = &lvSettingsScreen;
+
+    ui.lvTabBar().setTabCallback([](int tab) {
+        if (lvTabScreens[tab]) ui.setLvScreen(lvTabScreens[tab]);
     });
 
     // Name input screen (first boot only — when no display name is set)
-    nameInputScreen.setDoneCallback([](const String& name) {
+    lvNameInputScreen.setDoneCallback([](const String& name) {
         userConfig.settings().displayName = name;
         userConfig.save(sdStore, flash);
         Serial.printf("[BOOT] Display name set: '%s'\n", name.c_str());
 
         // Transition to home screen
         ui.setBootMode(false);
-        ui.setScreen(&homeScreen);
-        ui.tabBar().setActiveTab(TabBar::TAB_HOME);
+        ui.setLvScreen(&lvHomeScreen);
+        ui.lvTabBar().setActiveTab(LvTabBar::TAB_HOME);
 
         // Initial announce with name
         RNS::Bytes appData = encodeAnnounceName(userConfig.settings().displayName);
         rns.announce(appData);
         lastAutoAnnounce = millis();
         ui.statusBar().flashAnnounce();
+        ui.lvStatusBar().flashAnnounce();
         Serial.println("[BOOT] Initial announce sent");
     });
 
     if (userConfig.settings().displayName.isEmpty()) {
         // Show name input screen (boot mode keeps status/tab bars hidden)
-        ui.setScreen(&nameInputScreen);
+        ui.setLvScreen(&lvNameInputScreen);
         Serial.println("[BOOT] Showing name input screen");
     } else {
         // Name already set — go straight to home
         ui.setBootMode(false);
-        ui.setScreen(&homeScreen);
-        ui.tabBar().setActiveTab(TabBar::TAB_HOME);
+        ui.setLvScreen(&lvHomeScreen);
+        ui.lvTabBar().setActiveTab(LvTabBar::TAB_HOME);
 
         // Initial announce with name
         RNS::Bytes appData = encodeAnnounceName(userConfig.settings().displayName);
@@ -682,21 +780,30 @@ void setup() {
 void loop() {
     // 1. Input polling
     inputManager.update();
-    if (inputManager.hadActivity()) {
-        powerMgr.activity();
+    if (inputManager.hadStrongActivity()) {
+        powerMgr.activity();       // Keyboard/touch: wake from any state
+    } else if (inputManager.hadActivity()) {
+        powerMgr.weakActivity();   // Trackball: wake from dim only
     }
 
-    // 2. Key event dispatch
+    // 2. Long-press dispatch
+    if (inputManager.hadLongPress()) {
+        ui.handleLongPress();
+    }
+
+    // 3. Key event dispatch
     if (inputManager.hasKeyEvent()) {
         const KeyEvent& evt = inputManager.getKeyEvent();
 
         // Help overlay intercepts all keys when visible
-        if (helpOverlay.isVisible()) {
-            helpOverlay.handleKey(evt);
-            ui.setOverlay(helpOverlay.isVisible() ? &helpOverlay : nullptr);
+        if (lvHelpOverlay.isVisible()) {
+            lvHelpOverlay.handleKey(evt);
         }
         // Ctrl+hotkeys first
         else if (!hotkeys.process(evt)) {
+            // Feed key to LVGL input system
+            LvInput::feedKey(evt);
+
             // Screen gets the key next
             bool consumed = ui.handleKey(evt);
 
@@ -705,93 +812,99 @@ void loop() {
                 bool tabLeft  = (evt.character == ',') || evt.left;
                 bool tabRight = (evt.character == '/') || evt.right;
                 if (tabLeft) {
-                    ui.tabBar().cycleTab(-1);
-                    int tab = ui.tabBar().getActiveTab();
-                    if (tabScreens[tab]) ui.setScreen(tabScreens[tab]);
+                    ui.lvTabBar().cycleTab(-1);
+                    int tab = ui.lvTabBar().getActiveTab();
+                    if (lvTabScreens[tab]) ui.setLvScreen(lvTabScreens[tab]);
                 }
                 if (tabRight) {
-                    ui.tabBar().cycleTab(1);
-                    int tab = ui.tabBar().getActiveTab();
-                    if (tabScreens[tab]) ui.setScreen(tabScreens[tab]);
+                    ui.lvTabBar().cycleTab(1);
+                    int tab = ui.lvTabBar().getActiveTab();
+                    if (lvTabScreens[tab]) ui.setLvScreen(lvTabScreens[tab]);
                 }
             }
         }
     }
 
-    // 3. Reticulum loop (radio RX via LoRaInterface)
-    rns.loop();
+    // 3. LVGL timer handler — run FIRST after input for responsive UI
+    if (powerMgr.isScreenOn()) {
+        lv_timer_handler();
+    }
 
-    // 4. Auto-announce every 5 minutes
+    // 4. Reticulum loop (radio RX via LoRaInterface) — throttle to ~200Hz
+    {
+        static unsigned long lastRNS = 0;
+        unsigned long now = millis();
+        if (now - lastRNS >= 5) {
+            lastRNS = now;
+            rns.loop();
+        }
+    }
+
+    // 5. Auto-announce every 5 minutes
     if (bootComplete && millis() - lastAutoAnnounce >= ANNOUNCE_INTERVAL_MS) {
         lastAutoAnnounce = millis();
         RNS::Bytes appData = encodeAnnounceName(userConfig.settings().displayName);
         rns.announce(appData);
         ui.statusBar().flashAnnounce();
+        ui.lvStatusBar().flashAnnounce();
         Serial.println("[AUTO] Periodic announce");
     }
 
-    // 5. LXMF outgoing queue
+    // 6. LXMF outgoing queue + announce manager deferred saves
     lxmf.loop();
+    if (announceManager) announceManager->loop();
 
-    // 6. WiFi STA connection handler
+    // 7. WiFi STA connection handler
     if (wifiSTAStarted) {
         bool connected = (WiFi.status() == WL_CONNECTED);
         if (connected && !wifiSTAConnected) {
             wifiSTAConnected = true;
             ui.statusBar().setWiFiActive(true);
+            ui.lvStatusBar().setWiFiActive(true);
             Serial.printf("[WIFI] STA connected: %s\n", WiFi.localIP().toString().c_str());
 
-            if (!tcpClientsCreated) {
-                tcpClientsCreated = true;
-                for (auto& ep : userConfig.settings().tcpConnections) {
-                    if (ep.autoConnect) {
-                        char name[32];
-                        snprintf(name, sizeof(name), "TCP.%s", ep.host.c_str());
-                        auto* tcp = new TCPClientInterface(ep.host.c_str(), ep.port, name);
-                        tcpIfaces.emplace_back(tcp);
-                        tcpIfaces.back().mode(RNS::Type::Interface::MODE_GATEWAY);
-                        RNS::Transport::register_interface(tcpIfaces.back());
-                        tcp->start();
-                        tcpClients.push_back(tcp);
-                    }
-                }
+            // Create TCP clients (safe to call multiple times)
+            if (tcpClients.empty()) {
+                reloadTCPClients();
             }
         } else if (!connected && wifiSTAConnected) {
             wifiSTAConnected = false;
             ui.statusBar().setWiFiActive(false);
+            ui.lvStatusBar().setWiFiActive(false);
             Serial.println("[WIFI] STA disconnected");
         }
     }
 
-    // 7. WiFi + TCP loops
+    // 8. WiFi + TCP loops
     if (wifiImpl) wifiImpl->loop();
     for (auto* tcp : tcpClients) {
         tcp->loop();
         yield();
     }
 
-    // 8. BLE loops
+    // 9. BLE loops
     bleInterface.loop();
     bleSideband.loop();
 
-    // 9. Power management
+    // 10. Power management
     powerMgr.loop();
 
-    // 10. Periodic status bar update (1 Hz) + render
+    // 11. Periodic status bar update (1 Hz) + render
     if (millis() - lastStatusUpdate >= STATUS_UPDATE_MS) {
         lastStatusUpdate = millis();
         if (powerMgr.isScreenOn()) {
             ui.statusBar().setBatteryPercent(powerMgr.batteryPercent());
+            ui.lvStatusBar().setBatteryPercent(powerMgr.batteryPercent());
             ui.update();
         }
     }
 
-    // 11. Render any dirty regions
+    // 12. Render any dirty regions
     if (powerMgr.isScreenOn()) {
         ui.render();
     }
 
-    // 12. Heartbeat for crash diagnosis
+    // 13. Heartbeat for crash diagnosis
     {
         unsigned long cycleTime = millis() - loopCycleStart;
         if (cycleTime > maxLoopTime) maxLoopTime = cycleTime;
@@ -817,5 +930,4 @@ void loop() {
     loopCycleStart = millis();
 
     yield();
-    delay(5);
 }

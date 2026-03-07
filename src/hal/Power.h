@@ -11,15 +11,17 @@ public:
     void begin();
     void loop();
 
-    // Call on any user activity (keypress, touch, trackball)
+    // Strong activity = keyboard/touch — wakes from any state
     void activity();
+    // Weak activity = trackball — wakes from DIM only, not SCREEN_OFF
+    void weakActivity();
 
     // Battery
     float batteryVoltage() const;
     int batteryPercent() const;
 
-    // Backlight
-    void setBrightness(uint8_t brightness);
+    // Backlight — accepts percentage 1-100
+    void setBrightness(uint8_t percent);
     void setDimTimeout(uint16_t seconds) { _dimTimeout = seconds * 1000UL; }
     void setOffTimeout(uint16_t seconds) { _offTimeout = seconds * 1000UL; }
 
@@ -29,11 +31,12 @@ public:
 
 private:
     void setState(State newState);
+    uint8_t percentToPWM(uint8_t pct) const;
 
     State _state = ACTIVE;
     unsigned long _lastActivity = 0;
     unsigned long _dimTimeout = 30000;
     unsigned long _offTimeout = 60000;
-    uint8_t _fullBrightness = 255;
-    static constexpr uint8_t DIM_BRIGHTNESS = 64;
+    uint8_t _brightnessPct = 100;  // User brightness as 1-100%
+    static constexpr uint8_t DIM_PWM = 40;  // ~15% PWM when dimmed
 };

@@ -46,7 +46,10 @@ bool UserConfig::parseJson(const String& json) {
 
     _settings.screenDimTimeout = doc["screen_dim"] | 30;
     _settings.screenOffTimeout = doc["screen_off"] | 60;
-    _settings.brightness       = doc["brightness"] | 255;
+    // Brightness: stored as 1-100%. Migrate old 0-255 values.
+    int rawBri = doc["brightness"] | 100;
+    if (rawBri > 100) rawBri = rawBri * 100 / 255;  // Migrate from PWM to percentage
+    _settings.brightness = constrain(rawBri, 1, 100);
     _settings.denseFontMode    = doc["dense_font"] | false;
     _settings.trackballSpeed   = doc["trackball_speed"] | 3;
     _settings.touchSensitivity = doc["touch_sens"] | 3;

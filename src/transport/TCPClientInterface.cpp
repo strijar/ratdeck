@@ -42,8 +42,9 @@ void TCPClientInterface::tryConnect() {
 void TCPClientInterface::loop() {
     if (!_online) return;
 
-    // Auto-reconnect
+    // Auto-reconnect (only if WiFi is connected)
     if (!_client.connected()) {
+        if (WiFi.status() != WL_CONNECTED) return;
         if (millis() - _lastAttempt >= TCP_RECONNECT_INTERVAL_MS) {
             tryConnect();
         }

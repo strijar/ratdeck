@@ -57,6 +57,9 @@ class Display {
 public:
     bool begin();
 
+    // Initialize LVGL display driver with double-buffered DMA flush
+    void beginLVGL();
+
     // Backlight
     void setBrightness(uint8_t level);
     void sleep();

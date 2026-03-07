@@ -1,4 +1,20 @@
 #include "Display.h"
+#include <lvgl.h>
+
+// Double-buffered 10-line strips in PSRAM for DMA flush
+static lv_color_t* s_buf1 = nullptr;
+static lv_color_t* s_buf2 = nullptr;
+static LGFX_TDeck* s_gfx = nullptr;
+
+static void lvgl_flush_cb(lv_disp_drv_t* drv, const lv_area_t* area, lv_color_t* color_p) {
+    uint32_t w = area->x2 - area->x1 + 1;
+    uint32_t h = area->y2 - area->y1 + 1;
+    s_gfx->startWrite();
+    s_gfx->setAddrWindow(area->x1, area->y1, w, h);
+    s_gfx->pushPixelsDMA((lgfx::swap565_t*)&color_p->full, w * h);
+    s_gfx->endWrite();
+    lv_disp_flush_ready(drv);
+}
 
 bool Display::begin() {
     _gfx.init();
@@ -10,6 +26,39 @@ bool Display::begin() {
                   _gfx.width(), _gfx.height());
 
     return true;
+}
+
+void Display::beginLVGL() {
+    s_gfx = &_gfx;
+
+    lv_init();
+
+    // Allocate double-buffered 10-line strips in PSRAM
+    const uint32_t bufSize = 320 * 10;
+    s_buf1 = (lv_color_t*)heap_caps_malloc(bufSize * sizeof(lv_color_t), MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    s_buf2 = (lv_color_t*)heap_caps_malloc(bufSize * sizeof(lv_color_t), MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+
+    // Fall back to PSRAM if DMA-capable memory not available
+    if (!s_buf1) s_buf1 = (lv_color_t*)ps_malloc(bufSize * sizeof(lv_color_t));
+    if (!s_buf2) s_buf2 = (lv_color_t*)ps_malloc(bufSize * sizeof(lv_color_t));
+
+    if (!s_buf1 || !s_buf2) {
+        Serial.println("[LVGL] FATAL: buffer allocation failed!");
+        return;
+    }
+
+    static lv_disp_draw_buf_t draw_buf;
+    lv_disp_draw_buf_init(&draw_buf, s_buf1, s_buf2, bufSize);
+
+    static lv_disp_drv_t disp_drv;
+    lv_disp_drv_init(&disp_drv);
+    disp_drv.hor_res = 320;
+    disp_drv.ver_res = 240;
+    disp_drv.flush_cb = lvgl_flush_cb;
+    disp_drv.draw_buf = &draw_buf;
+    lv_disp_drv_register(&disp_drv);
+
+    Serial.println("[LVGL] Display driver registered (320x240, double-buffered 10-line DMA)");
 }
 
 void Display::setBrightness(uint8_t level) {

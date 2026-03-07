@@ -40,6 +40,11 @@ void LoRaInterface::stop() {
 void LoRaInterface::send_outgoing(const RNS::Bytes& data) {
     if (!_online || !_radio) return;
 
+    if (_txPending) {
+        Serial.println("[LORA_IF] TX busy, dropping packet");
+        return;
+    }
+
     // Build RNode-compatible 1-byte header:
     //   Upper nibble: random sequence number (for split-packet tracking)
     //   Lower nibble: flags (FLAG_SPLIT=0x01 if packet won't fit in single frame)
@@ -57,21 +62,26 @@ void LoRaInterface::send_outgoing(const RNS::Bytes& data) {
     _radio->beginPacket();
     _radio->write(header);                        // 1-byte RNode header
     _radio->write(data.data(), data.size());      // Reticulum packet payload
-    bool sent = _radio->endPacket();
+    _radio->endPacket(true);                      // Async: start TX and return immediately
 
-    if (sent) {
-        Serial.printf("[LORA_IF] TX %d+1 bytes (hdr=0x%02X)\n", data.size(), header);
-        InterfaceImpl::handle_outgoing(data);
-    } else {
-        Serial.println("[LORA_IF] TX failed (timeout)");
-    }
-
-    // Return to RX mode
-    _radio->receive();
+    _txPending = true;
+    _txData = data;
+    InterfaceImpl::handle_outgoing(data);
+    Serial.printf("[LORA_IF] TX %d+1 bytes queued (hdr=0x%02X)\n", data.size(), header);
 }
 
 void LoRaInterface::loop() {
     if (!_online || !_radio) return;
+
+    // Handle async TX completion
+    if (_txPending) {
+        if (!_radio->isTxBusy()) {
+            _txPending = false;
+            _txData = RNS::Bytes();
+            _radio->receive();
+        }
+        return;  // Don't process RX while TX is active
+    }
 
     // Periodic RX debug: dump RSSI + chip status every 30 seconds
     static unsigned long lastRxDebug = 0;

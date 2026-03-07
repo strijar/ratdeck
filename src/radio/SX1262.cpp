@@ -144,6 +144,7 @@ void SX1262::waitOnBusy() {
     if (_busy != -1) {
         while (digitalRead(_busy) == HIGH) {
             if (millis() >= (t + 100)) break;
+            if (_yieldCb) _yieldCb();
         }
     }
 }
@@ -293,25 +294,33 @@ int SX1262::beginPacket(int implicitHeader) {
     return 1;
 }
 
-int SX1262::endPacket() {
+int SX1262::endPacket(bool async) {
     setPacketParams(_preambleLength, _implicitHeaderMode, _payloadLength, _crcMode);
 
     uint8_t timeout[3] = {0};
-    uint32_t txStart = millis();
+    _txStartMs = millis();
+    _txTimeoutMs = _txStartMs + (uint32_t)(getAirtime(_payloadLength) * MODEM_TIMEOUT_MULT) + 2000;
     executeOpcode(OP_TX_6X, timeout, 3);
 
+    if (async) {
+        _txActive = true;
+        Serial.printf("[SX1262] TX ASYNC: payload=%d calc=%.0fms\n",
+                      _payloadLength, getAirtime(_payloadLength));
+        return 1;
+    }
+
+    // Blocking mode: wait for TX completion
     uint8_t buf[2] = {0};
     executeOpcodeRead(OP_GET_IRQ_STATUS_6X, buf, 2);
 
-    bool timed_out = false;
-    uint32_t w_timeout = txStart + (uint32_t)(getAirtime(_payloadLength) * MODEM_TIMEOUT_MULT) + 2000;
-    while ((millis() < w_timeout) && ((buf[1] & IRQ_TX_DONE_MASK_6X) == 0)) {
+    while ((millis() < _txTimeoutMs) && ((buf[1] & IRQ_TX_DONE_MASK_6X) == 0)) {
         buf[0] = 0x00; buf[1] = 0x00;
         executeOpcodeRead(OP_GET_IRQ_STATUS_6X, buf, 2);
         yield();
+        if (_yieldCb) _yieldCb();
     }
-    uint32_t txActual = millis() - txStart;
-    if (millis() > w_timeout) { timed_out = true; }
+    uint32_t txActual = millis() - _txStartMs;
+    bool timed_out = millis() > _txTimeoutMs;
 
     if (timed_out) {
         Serial.printf("[SX1262] TX TIMEOUT: payload=%d actual=%dms calc=%.0fms\n",
@@ -324,6 +333,34 @@ int SX1262::endPacket() {
     uint8_t mask[2] = {0x00, IRQ_TX_DONE_MASK_6X};
     executeOpcode(OP_CLEAR_IRQ_STATUS_6X, mask, 2);
     return !timed_out;
+}
+
+bool SX1262::isTxBusy() {
+    if (!_txActive) return false;
+
+    // Check for timeout
+    if (millis() > _txTimeoutMs) {
+        Serial.printf("[SX1262] TX ASYNC TIMEOUT after %dms\n",
+                      (int)(millis() - _txStartMs));
+        uint8_t mask[2] = {0x00, IRQ_TX_DONE_MASK_6X};
+        executeOpcode(OP_CLEAR_IRQ_STATUS_6X, mask, 2);
+        _txActive = false;
+        return false;
+    }
+
+    // Poll IRQ status
+    uint8_t buf[2] = {0};
+    executeOpcodeRead(OP_GET_IRQ_STATUS_6X, buf, 2);
+    if (buf[1] & IRQ_TX_DONE_MASK_6X) {
+        Serial.printf("[SX1262] TX ASYNC OK: %dms\n",
+                      (int)(millis() - _txStartMs));
+        uint8_t mask[2] = {0x00, IRQ_TX_DONE_MASK_6X};
+        executeOpcode(OP_CLEAR_IRQ_STATUS_6X, mask, 2);
+        _txActive = false;
+        return false;
+    }
+
+    return true;  // Still transmitting
 }
 
 size_t SX1262::write(uint8_t byte) { return write(&byte, 1); }

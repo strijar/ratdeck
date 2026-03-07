@@ -38,12 +38,17 @@ bool LittleFSFileSystem::directory_exists(const char* p) { return LittleFS.exist
 bool LittleFSFileSystem::create_directory(const char* p) { return LittleFS.mkdir(p); }
 bool LittleFSFileSystem::remove_directory(const char* p) { return LittleFS.rmdir(p); }
 
-std::list<std::string> LittleFSFileSystem::list_directory(const char* p) {
+std::list<std::string> LittleFSFileSystem::list_directory(const char* p, Callbacks::DirectoryListing callback) {
     std::list<std::string> entries;
     File dir = LittleFS.open(p);
     if (!dir || !dir.isDirectory()) return entries;
     File f = dir.openNextFile();
-    while (f) { entries.push_back(f.name()); f = dir.openNextFile(); }
+    while (f) {
+        const char* name = f.name();
+        entries.push_back(name);
+        if (callback) callback(name);
+        f = dir.openNextFile();
+    }
     return entries;
 }
 
