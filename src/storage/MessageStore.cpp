@@ -246,7 +246,7 @@ void MessageStore::refreshConversations() {
     }
 }
 
-bool MessageStore::saveMessage(const LXMFMessage& msg) {
+bool MessageStore::saveMessage(LXMFMessage& msg) {
     if (!_flash) return false;
 
     std::string peerHex = msg.incoming ?
@@ -270,6 +270,7 @@ bool MessageStore::saveMessage(const LXMFMessage& msg) {
 
     // Counter-based filename: unique, monotonic, sorts correctly
     uint32_t counter = _nextReceiveCounter++;
+    msg.savedCounter = counter;
     char filename[64];
     snprintf(filename, sizeof(filename), "%013lu_%c.json",
              (unsigned long)counter, msg.incoming ? 'i' : 'o');
@@ -392,15 +393,6 @@ std::vector<LXMFMessage> MessageStore::loadConversation(const std::string& peerH
             });
         }
     }
-
-    // Sort chronologically; non-epoch timestamps (uptime-based) sort before epoch
-    std::sort(messages.begin(), messages.end(),
-              [](const LXMFMessage& a, const LXMFMessage& b) {
-                  bool aEpoch = a.timestamp > 1700000000;
-                  bool bEpoch = b.timestamp > 1700000000;
-                  if (aEpoch != bEpoch) return !aEpoch; // non-epoch sorts before epoch
-                  return a.timestamp < b.timestamp;
-              });
 
     return messages;
 }
@@ -595,6 +587,44 @@ bool MessageStore::updateMessageStatus(const std::string& peerHex, double timest
         updated = updated || flashUpdated;
     }
 
+    return updated;
+}
+
+bool MessageStore::updateMessageStatusByCounter(const std::string& peerHex, uint32_t counter, bool incoming, LXMFStatus newStatus) {
+    if (counter == 0) return false;  // Not saved yet
+    char filename[64];
+    snprintf(filename, sizeof(filename), "%013lu_%c.json",
+             (unsigned long)counter, incoming ? 'i' : 'o');
+
+    auto readModifyWrite = [&](auto readFn, auto writeFn, const String& dir) -> bool {
+        String path = dir + "/" + filename;
+        String json = readFn(path.c_str());
+        if (json.length() == 0) return false;
+        JsonDocument doc;
+        if (deserializeJson(doc, json)) return false;
+        doc["status"] = (int)newStatus;
+        String updated;
+        serializeJson(doc, updated);
+        writeFn(path.c_str(), updated);
+        return true;
+    };
+
+    bool updated = false;
+    if (_sd && _sd->isReady()) {
+        String sdDir = sdConversationDir(peerHex);
+        updated = readModifyWrite(
+            [&](const char* p) { return _sd->readString(p); },
+            [&](const char* p, const String& d) { _sd->writeString(p, d); },
+            sdDir);
+    }
+    if (_flash) {
+        String dir = conversationDir(peerHex);
+        bool flashUpdated = readModifyWrite(
+            [this](const char* p) { return _flash->readString(p); },
+            [this](const char* p, const String& d) { _flash->writeString(p, d); },
+            dir);
+        updated = updated || flashUpdated;
+    }
     return updated;
 }
 

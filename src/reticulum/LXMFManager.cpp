@@ -30,7 +30,9 @@ void LXMFManager::loop() {
 
         // Persist updated status to disk so reloads don't revert to QUEUED
         std::string peerHex = msg.destHash.toHex();
-        if (_store) {
+        if (_store && msg.savedCounter > 0) {
+            _store->updateMessageStatusByCounter(peerHex, msg.savedCounter, false, msg.status);
+        } else if (_store) {
             _store->updateMessageStatus(peerHex, msg.timestamp, false, msg.status);
         }
 
@@ -60,7 +62,8 @@ bool LXMFManager::sendMessage(const RNS::Bytes& destHash, const std::string& con
     if ((int)_outQueue.size() >= RATDECK_MAX_OUTQUEUE) { _outQueue.pop_front(); }
     _outQueue.push_back(msg);
     // Immediately save with QUEUED status so it appears in getMessages() right away
-    if (_store) { _store->saveMessage(msg); }
+    // Save the queue copy so savedCounter propagates back to the queued message
+    if (_store) { _store->saveMessage(_outQueue.back()); }
     return true;
 }
 

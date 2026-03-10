@@ -20,7 +20,7 @@ class MessageStore {
 public:
     bool begin(FlashStore* flash, SDStore* sd = nullptr);
 
-    bool saveMessage(const LXMFMessage& msg);
+    bool saveMessage(LXMFMessage& msg);
     std::vector<LXMFMessage> loadConversation(const std::string& peerHex) const;
     const std::vector<std::string>& conversations() const { return _conversations; }
     void refreshConversations();
@@ -28,6 +28,7 @@ public:
     bool deleteConversation(const std::string& peerHex);
     void markConversationRead(const std::string& peerHex);
     bool updateMessageStatus(const std::string& peerHex, double timestamp, bool incoming, LXMFStatus newStatus);
+    bool updateMessageStatusByCounter(const std::string& peerHex, uint32_t counter, bool incoming, LXMFStatus newStatus);
 
     const ConversationSummary* getSummary(const std::string& peerHex) const;
     int totalUnreadCount() const;
