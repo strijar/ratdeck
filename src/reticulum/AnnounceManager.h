@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <unordered_map>
 
 class SDStore;
 class FlashStore;
@@ -51,6 +52,7 @@ public:
     void evictStale(unsigned long maxAgeMs = 3600000);
     void clearTransientNodes();
     void clearAll();
+    void rebuildIndex();
 
 private:
     void saveContact(const DiscoveredNode& node);
@@ -67,8 +69,14 @@ private:
     std::map<std::string, std::string> _nameCache;  // hexHash → displayName
     unsigned long _globalAnnounceWindowStart = 0;
     unsigned int _globalAnnounceCount = 0;
-    static constexpr unsigned int MAX_GLOBAL_ANNOUNCES_PER_SEC = 3;
-    static constexpr int MAX_NODES = 30;
+    static constexpr unsigned int MAX_GLOBAL_ANNOUNCES_PER_SEC = 10;
+    static constexpr int MAX_NODES = 200;
     static constexpr unsigned long CONTACT_SAVE_INTERVAL_MS = 30000;
     static constexpr unsigned long ANNOUNCE_MIN_INTERVAL_MS = 200;  // Rate-limit announce processing
+
+    std::unordered_map<std::string, int> _hashIndex;  // raw hash bytes → _nodes index
+
+    static std::string makeKey(const RNS::Bytes& hash) {
+        return std::string((const char*)hash.data(), hash.size());
+    }
 };

@@ -122,7 +122,7 @@ unsigned long loopCycleStart = 0;
 unsigned long maxLoopTime = 0;
 unsigned long lastLvglTime = 0;
 constexpr unsigned long LVGL_INTERVAL_MS = 33;          // ~30 FPS
-constexpr unsigned long TCP_GLOBAL_BUDGET_MS = 12;      // Max cumulative TCP time per loop
+constexpr unsigned long TCP_GLOBAL_BUDGET_MS = 18;      // Max cumulative TCP time per loop
 bool wifiDeferredAnnounce = false;
 unsigned long wifiConnectedAt = 0;
 
@@ -901,11 +901,15 @@ void loop() {
     // 5. Auto-announce every 5 minutes
     if (bootComplete && millis() - lastAutoAnnounce >= ANNOUNCE_INTERVAL_MS) {
         lastAutoAnnounce = millis();
-        RNS::Bytes appData = encodeAnnounceName(userConfig.settings().displayName);
-        rns.announce(appData);
-        ui.statusBar().flashAnnounce();
-        ui.lvStatusBar().flashAnnounce();
-        Serial.println("[AUTO] Periodic announce");
+        if (rns.loraInterface() && rns.loraInterface()->airtimeUtilization() > LoRaInterface::AIRTIME_THROTTLE) {
+            Serial.println("[AUTO] Skipping announce: LoRa airtime > 25%");
+        } else {
+            RNS::Bytes appData = encodeAnnounceName(userConfig.settings().displayName);
+            rns.announce(appData);
+            ui.statusBar().flashAnnounce();
+            ui.lvStatusBar().flashAnnounce();
+            Serial.println("[AUTO] Periodic announce");
+        }
     }
 
     // 6. LXMF outgoing queue + announce manager deferred saves

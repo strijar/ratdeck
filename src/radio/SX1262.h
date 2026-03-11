@@ -61,6 +61,7 @@ public:
     void clearDeviceErrors();
     uint8_t getStatus();
     uint16_t getIrqFlags();
+    float getAirtime(uint16_t written);
 
     // --- FIFO access ---
     void readBuffer(uint8_t* buffer, size_t size);
@@ -101,8 +102,6 @@ private:
     void explicitHeaderMode();
     void implicitHeaderMode();
     void handleLowDataRate();
-
-    float getAirtime(uint16_t written);
 
     void handleDio0Rise();
     bool getPacketValidity();

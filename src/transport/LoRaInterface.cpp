@@ -1,5 +1,6 @@
 #include "LoRaInterface.h"
 #include "config/BoardConfig.h"
+#include <algorithm>
 
 // RNode on-air framing constants (from RNode_Firmware_CE Framing.h / Config.h)
 // Every LoRa packet has a 1-byte header: upper nibble = random sequence, lower nibble = flags
@@ -68,6 +69,22 @@ void LoRaInterface::send_outgoing(const RNS::Bytes& data) {
     _txData = data;
     InterfaceImpl::handle_outgoing(data);
     Serial.printf("[LORA_IF] TX %d+1 bytes queued (hdr=0x%02X)\n", data.size(), header);
+
+    // Track airtime
+    float airtimeMs = _radio->getAirtime(data.size() + RNODE_HEADER_L);
+    unsigned long txNow = millis();
+    if (txNow - _airtimeWindowStart >= AIRTIME_WINDOW_MS) {
+        _airtimeAccumMs = 0;
+        _airtimeWindowStart = txNow;
+    } else {
+        float elapsed = (float)(txNow - _airtimeWindowStart);
+        float remaining = 1.0f - (elapsed / AIRTIME_WINDOW_MS);
+        if (remaining < 0) remaining = 0;
+        _airtimeAccumMs *= remaining;
+        _airtimeWindowStart = txNow;
+    }
+    _airtimeAccumMs += airtimeMs;
+    Serial.printf("[LORA_IF] TX airtime: %.1fms (util=%.1f%%)\n", airtimeMs, airtimeUtilization() * 100);
 }
 
 void LoRaInterface::loop() {
@@ -125,4 +142,12 @@ void LoRaInterface::loop() {
         Serial.printf("[LORA_IF] RX runt packet (%d bytes), discarding\n", packetSize);
         _radio->receive();
     }
+}
+
+float LoRaInterface::airtimeUtilization() const {
+    if (_airtimeAccumMs <= 0) return 0;
+    unsigned long elapsed = millis() - _airtimeWindowStart;
+    if (elapsed == 0) elapsed = 1;
+    float windowMs = std::min((float)elapsed, (float)AIRTIME_WINDOW_MS);
+    return _airtimeAccumMs / windowMs;
 }

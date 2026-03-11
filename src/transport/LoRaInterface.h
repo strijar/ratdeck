@@ -16,6 +16,8 @@ public:
         return "LoRaInterface[" + _name + "]";
     }
 
+    float airtimeUtilization() const;
+
 protected:
     virtual void send_outgoing(const RNS::Bytes& data) override;
 
@@ -23,4 +25,10 @@ private:
     SX1262* _radio;
     bool _txPending = false;
     RNS::Bytes _txData;
+
+    unsigned long _airtimeWindowStart = 0;
+    float _airtimeAccumMs = 0;
+    static constexpr unsigned long AIRTIME_WINDOW_MS = 60000;
+public:
+    static constexpr float AIRTIME_THROTTLE = 0.25f;
 };

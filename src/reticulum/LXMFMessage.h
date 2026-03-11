@@ -22,6 +22,7 @@ struct LXMFMessage {
     bool incoming = false;
     bool read = false;
     int retries = 0;
+    unsigned long lastRetryMs = 0;
     uint32_t savedCounter = 0;
     RNS::Bytes messageId;
 

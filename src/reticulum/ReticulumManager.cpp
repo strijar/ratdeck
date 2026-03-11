@@ -93,8 +93,8 @@ bool ReticulumManager::begin(SX1262* radio, FlashStore* flash) {
     _reticulum = RNS::Reticulum();
     RNS::Reticulum::transport_enabled(false);
     RNS::Reticulum::probe_destination_enabled(true);
-    RNS::Transport::path_table_maxsize(32);
-    RNS::Transport::announce_table_maxsize(32);
+    RNS::Transport::path_table_maxsize(256);
+    RNS::Transport::announce_table_maxsize(128);
     _reticulum.start();
     Serial.println("[RNS] Reticulum started (Endpoint)");
 

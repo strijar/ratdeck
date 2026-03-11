@@ -24,9 +24,10 @@ public:
     const char* title() const override { return "Nodes"; }
 
 private:
-    void rebuildList();
-    void updateSelection(int oldIdx, int newIdx);
+    void updateSortOrder();
+    void syncVisibleRows();
     void scrollToSelected();
+    int getNodeIdxForEntry(int entry) const;
 
     AnnounceManager* _am = nullptr;
     class UIManager* _ui = nullptr;
@@ -35,18 +36,23 @@ private:
     int _lastNodeCount = -1;
     int _lastContactCount = -1;
     int _selectedIdx = 0;
-    int _totalRows = 0;
+    int _totalEntries = 0;        // Total displayable entries (contacts + headers + online)
 
-    // Section tracking
-    bool _contactsCollapsed = false;
-    int _contactHeaderIdx = -1;   // Row index of "Contacts" header
-    int _onlineHeaderIdx = -1;    // Row index of "Online" header
-    std::vector<int> _rowToNodeIdx; // Maps row index -> node index in _am->nodes(), -1 for headers
+    // Sorted index vectors (into _am->nodes())
+    std::vector<int> _sortedContactIndices;
+    std::vector<int> _sortedOnlineIndices;
+    bool _dataChanged = false;
 
     unsigned long _lastRebuild = 0;
     static constexpr unsigned long REBUILD_INTERVAL_MS = 5000;
 
+    // Widget pool — fixed set of pre-allocated row widgets
+    static constexpr int ROW_POOL_SIZE = 14;
+    lv_obj_t* _poolRows[ROW_POOL_SIZE] = {};
+    lv_obj_t* _poolNameLabels[ROW_POOL_SIZE] = {};
+    lv_obj_t* _poolInfoLabels[ROW_POOL_SIZE] = {};
+    int _viewportStart = 0;       // First visible sorted index
+
     lv_obj_t* _list = nullptr;
     lv_obj_t* _lblEmpty = nullptr;
-    std::vector<lv_obj_t*> _rows;
 };
