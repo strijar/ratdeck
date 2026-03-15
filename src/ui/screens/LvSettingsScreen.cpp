@@ -450,14 +450,7 @@ void LvSettingsScreen::buildItems() {
         announceItem.formatter = [](int) { return String("[Enter]"); };
         announceItem.action = [this]() {
             if (_rns && _cfg) {
-                const String& name = _cfg->settings().displayName;
-                RNS::Bytes appData;
-                if (!name.isEmpty()) {
-                    size_t len = name.length(); if (len > 31) len = 31;
-                    uint8_t buf[2 + 31]; buf[0] = 0x91; buf[1] = 0xA0 | (uint8_t)len;
-                    memcpy(buf + 2, name.c_str(), len);
-                    appData = RNS::Bytes(buf, 2 + len);
-                }
+                RNS::Bytes appData = encodeAnnounceName(_cfg->settings().displayName);
                 _rns->announce(appData);
                 if (_ui) { _ui->lvStatusBar().flashAnnounce(); _ui->lvStatusBar().showToast("Announce sent!"); }
             } else {

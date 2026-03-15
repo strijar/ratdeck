@@ -130,7 +130,7 @@ unsigned long wifiConnectedAt = 0;
 // Announce with display name (MessagePack-encoded app_data)
 // =============================================================================
 
-static RNS::Bytes encodeAnnounceName(const String& name) {
+RNS::Bytes encodeAnnounceName(const String& name) {
     if (name.isEmpty()) return {};
     size_t len = name.length();
     if (len > 31) len = 31;

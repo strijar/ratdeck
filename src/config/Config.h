@@ -6,8 +6,8 @@
 
 #define RATDECK_VERSION_MAJOR  1
 #define RATDECK_VERSION_MINOR  6
-#define RATDECK_VERSION_PATCH  1
-#define RATDECK_VERSION_STRING "1.6.1"
+#define RATDECK_VERSION_PATCH  2
+#define RATDECK_VERSION_STRING "1.6.2"
 
 // --- Feature Flags ---
 #define HAS_DISPLAY     true
@@ -63,3 +63,8 @@
 
 // --- Serial Debug ---
 #define SERIAL_BAUD  115200
+
+// --- Shared Utilities (defined in main.cpp) ---
+#include <Arduino.h>
+#include <Bytes.h>
+RNS::Bytes encodeAnnounceName(const String& name);
