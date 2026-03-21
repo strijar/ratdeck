@@ -45,7 +45,8 @@ private:
 
     // Outbound link state (opportunistic-first, link upgrades in background)
     RNS::Link _outLink{RNS::Type::NONE};
-    RNS::Bytes _outLinkDestHash;
+    RNS::Bytes _outLinkDestHash;       // Destination the ACTIVE _outLink is for
+    RNS::Bytes _outLinkPendingHash;    // Destination being connected to (not yet established)
     bool _outLinkPending = false;
 
     // Deduplication: recently seen message IDs
