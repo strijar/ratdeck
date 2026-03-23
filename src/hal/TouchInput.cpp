@@ -79,10 +79,11 @@ bool TouchInput::readGT911() {
     }
 
     uint8_t trackId = Wire.read();
-    _x = Wire.read() | (Wire.read() << 8);
     _y = Wire.read() | (Wire.read() << 8);
+    _x = Wire.read() | (Wire.read() << 8);
     Wire.read() | (Wire.read() << 8); // size (unused)
 
+    _y = TFT_HEIGHT - 1 - _y;
     _touched = true;
 
     // Clear buffer status
