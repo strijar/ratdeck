@@ -19,7 +19,7 @@
 #define HAS_BLE         true
 #define HAS_SD          true
 #define HAS_AUDIO       true
-#define HAS_GPS         false   // Deprioritized
+#define HAS_GPS         true    // UBlox MIA-M10Q UART GPS
 
 // --- WiFi Defaults ---
 #define WIFI_AP_PORT        4242

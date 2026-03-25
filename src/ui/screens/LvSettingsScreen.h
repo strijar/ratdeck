@@ -75,6 +75,7 @@ public:
     void setDestinationHash(const String& hash) { _destinationHash = hash; }
     void setSaveCallback(std::function<bool()> cb) { _saveCallback = cb; }
     void setTCPChangeCallback(std::function<void()> cb) { _tcpChangeCb = cb; }
+    void setGPSChangeCallback(std::function<void(bool enabled)> cb) { _gpsChangeCb = cb; }
 
     const char* title() const override { return "Settings"; }
 
@@ -114,6 +115,8 @@ private:
     String _destinationHash;
     std::function<bool()> _saveCallback;
     std::function<void()> _tcpChangeCb;
+    std::function<void(bool)> _gpsChangeCb;
+    bool _gpsSnapEnabled = true;
 
     SettingsView _view = SettingsView::CATEGORY_LIST;
     std::vector<SettingsCategory> _categories;

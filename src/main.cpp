@@ -15,6 +15,9 @@
 #include "hal/Trackball.h"
 #include "hal/Keyboard.h"
 #include "hal/Power.h"
+#if HAS_GPS
+#include "hal/GPSManager.h"
+#endif
 #include "radio/SX1262.h"
 #include "input/InputManager.h"
 #include "input/HotkeyManager.h"
@@ -89,6 +92,9 @@ UserConfig userConfig;
 Power powerMgr;
 AudioNotify audio;
 IdentityManager identityMgr;
+#if HAS_GPS
+GPSManager gps;
+#endif
 
 // --- LVGL Screens ---
 LvBootScreen lvBootScreen;
@@ -636,6 +642,17 @@ void setup() {
     powerMgr.setOffTimeout(userConfig.settings().screenOffTimeout);
     powerMgr.setBrightness(userConfig.settings().brightness);
 
+    // Step 24.5: GPS init
+#if HAS_GPS
+    if (userConfig.settings().gpsTimeEnabled) {
+        lvBootScreen.setProgress(0.93f, "Starting GPS...");
+        gps.setUTCOffset(userConfig.settings().utcOffset);
+        gps.setLocationEnabled(userConfig.settings().gpsLocationEnabled);
+        gps.begin();
+        Serial.println("[BOOT] GPS UART started (MIA-M10Q)");
+    }
+#endif
+
     // Step 25: Audio init
     lvBootScreen.setProgress(0.94f, "Audio...");
     // (LVGL boot renders via lv_timer_handler in setProgress)
@@ -734,6 +751,20 @@ void setup() {
         reloadTCPClients();
         if (announceManager) announceManager->clearTransientNodes();
     });
+#if HAS_GPS
+    lvSettingsScreen.setGPSChangeCallback([](bool timeEnabled) {
+        if (timeEnabled) {
+            gps.setUTCOffset(userConfig.settings().utcOffset);
+            gps.setLocationEnabled(userConfig.settings().gpsLocationEnabled);
+            gps.begin();
+            Serial.println("[GPS] Time enabled via settings");
+        } else {
+            gps.stop();
+            ui.lvStatusBar().setGPSFix(false);
+            Serial.println("[GPS] Disabled via settings");
+        }
+    });
+#endif
 
     // LVGL help overlay
     lvHelpOverlay.create();
@@ -925,9 +956,14 @@ void loop() {
             ui.lvStatusBar().setWiFiActive(true);
             Serial.printf("[WIFI] STA connected: %s\n", WiFi.localIP().toString().c_str());
 
-            // NTP time sync
-            configTzTime("UTC5", "pool.ntp.org", "time.nist.gov");
-            Serial.println("[NTP] Time sync started (UTC-5)");
+            // NTP time sync (configurable UTC offset)
+            {
+                int8_t off = userConfig.settings().utcOffset;
+                char tz[16];
+                snprintf(tz, sizeof(tz), "UTC%d", -off);
+                configTzTime(tz, "pool.ntp.org", "time.nist.gov");
+                Serial.printf("[NTP] Time sync started (UTC%+d, TZ=%s)\n", off, tz);
+            }
 
             // Recreate TCP clients on every WiFi connect (old clients may have stale sockets)
             reloadTCPClients();
@@ -984,6 +1020,13 @@ void loop() {
     bleInterface.loop();
     bleSideband.loop();
 
+    // 9.5. GPS poll (non-blocking, reads available UART bytes)
+#if HAS_GPS
+    if (userConfig.settings().gpsTimeEnabled) {
+        gps.loop();
+    }
+#endif
+
     // 10. Power management
     powerMgr.loop();
 
@@ -999,6 +1042,14 @@ void loop() {
                 if (tcp && tcp->isConnected()) { anyTcpUp = true; break; }
             }
             ui.lvStatusBar().setTCPConnected(anyTcpUp);
+#if HAS_GPS
+            if (userConfig.settings().gpsTimeEnabled) {
+                ui.lvStatusBar().setGPSFix(gps.hasTimeFix());
+            }
+#endif
+            // Update clock display (shows time from any valid source: GPS, NTP, etc.)
+            ui.lvStatusBar().setUse24Hour(userConfig.settings().use24HourTime);
+            ui.lvStatusBar().updateTime();
             ui.update();
         }
     }
@@ -1054,6 +1105,16 @@ void loop() {
                     (int)ifaces.size(), tcpUp, (int)tcpClients.size(),
                     wifiSTAConnected ? "STA" : (wifiImpl ? "AP" : "OFF"));
             }
+#if HAS_GPS
+            if (userConfig.settings().gpsTimeEnabled) {
+                Serial.printf("[GPS] sats=%d timeFix=%s locFix=%s syncs=%lu chars=%lu\n",
+                    gps.satellites(),
+                    gps.hasTimeFix() ? "YES" : "NO",
+                    gps.hasLocationFix() ? "YES" : "NO",
+                    (unsigned long)gps.timeSyncCount(),
+                    (unsigned long)gps.charsProcessed());
+            }
+#endif
             maxLoopTime = 0;
         }
     }

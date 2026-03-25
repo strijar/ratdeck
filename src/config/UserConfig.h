@@ -50,6 +50,12 @@ struct UserSettings {
     // BLE
     bool bleEnabled = false;
 
+    // GPS & Time
+    bool gpsTimeEnabled = true;      // GPS time sync (default ON)
+    bool gpsLocationEnabled = false; // GPS position tracking (default OFF, user must opt in)
+    int8_t utcOffset = -5;           // Hours from UTC (default EST)
+    bool use24HourTime = false;      // false = 12h (no AM/PM), true = 24h
+
     // Audio
     bool audioEnabled = true;
     uint8_t audioVolume = 80;  // 0-100

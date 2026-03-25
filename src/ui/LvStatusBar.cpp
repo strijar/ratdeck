@@ -1,6 +1,7 @@
 #include "LvStatusBar.h"
 #include "Theme.h"
 #include <Arduino.h>
+#include <time.h>
 
 void LvStatusBar::create(lv_obj_t* parent) {
     _bar = lv_obj_create(parent);
@@ -17,28 +18,26 @@ void LvStatusBar::create(lv_obj_t* parent) {
 
     const lv_font_t* font = &lv_font_montserrat_12;
 
-    // Left side: Signal bars (3 bars, increasing height)
-    static const int barW = 4;
-    static const int barH[] = {6, 10, 14};
-    static const int barGap = 2;
-    for (int i = 0; i < 3; i++) {
-        _bars[i] = lv_obj_create(_bar);
-        lv_obj_set_size(_bars[i], barW, barH[i]);
-        lv_obj_set_style_radius(_bars[i], 1, 0);
-        lv_obj_set_style_bg_opa(_bars[i], LV_OPA_COVER, 0);
-        lv_obj_set_style_border_width(_bars[i], 0, 0);
-        lv_obj_set_style_pad_all(_bars[i], 0, 0);
-        int x = 4 + i * (barW + barGap);
-        int y = Theme::STATUS_BAR_H - barH[i] - 3;  // bottom-aligned
-        lv_obj_set_pos(_bars[i], x, y);
-    }
+    // Left: Time display (hidden until valid time is available)
+    _lblTime = lv_label_create(_bar);
+    lv_obj_set_style_text_font(_lblTime, font, 0);
+    lv_obj_set_style_text_color(_lblTime, lv_color_hex(Theme::PRIMARY), 0);
+    lv_label_set_text(_lblTime, "");
+    lv_obj_align(_lblTime, LV_ALIGN_LEFT_MID, 4, 0);
 
-    // Center: "Ratspeak"
+    // Center: "Ratspeak.org"
     _lblBrand = lv_label_create(_bar);
     lv_obj_set_style_text_font(_lblBrand, font, 0);
     lv_obj_set_style_text_color(_lblBrand, lv_color_hex(Theme::ACCENT), 0);
-    lv_label_set_text(_lblBrand, "Ratspeak");
+    lv_label_set_text(_lblBrand, "Ratspeak.org");
     lv_obj_align(_lblBrand, LV_ALIGN_CENTER, 0, 0);
+
+    // Right: GPS indicator (left of battery, hidden until fix)
+    _lblGPS = lv_label_create(_bar);
+    lv_obj_set_style_text_font(_lblGPS, font, 0);
+    lv_obj_set_style_text_color(_lblGPS, lv_color_hex(Theme::PRIMARY), 0);
+    lv_label_set_text(_lblGPS, "");
+    lv_obj_align(_lblGPS, LV_ALIGN_RIGHT_MID, -42, 0);
 
     // Right: Battery %
     _lblBatt = lv_label_create(_bar);
@@ -62,16 +61,12 @@ void LvStatusBar::create(lv_obj_t* parent) {
     lv_obj_set_style_text_color(_lblToast, lv_color_hex(Theme::BG), 0);
     lv_obj_center(_lblToast);
     lv_label_set_text(_lblToast, "");
-
-    // Set initial indicator colors
-    refreshIndicators();
 }
 
 void LvStatusBar::update() {
     // Handle announce flash timeout
     if (_announceFlashEnd > 0 && millis() >= _announceFlashEnd) {
         _announceFlashEnd = 0;
-        refreshIndicators();
     }
 
     // Handle toast timeout
@@ -81,24 +76,39 @@ void LvStatusBar::update() {
     }
 }
 
-void LvStatusBar::setLoRaOnline(bool online) {
-    _loraOnline = online;
-    refreshIndicators();
+void LvStatusBar::updateTime() {
+    if (!_lblTime) return;
+
+    time_t now = time(nullptr);
+    if (now <= 1700000000) {
+        // No valid time yet — show nothing
+        lv_label_set_text(_lblTime, "");
+        return;
+    }
+
+    struct tm* local = localtime(&now);
+    if (!local) {
+        lv_label_set_text(_lblTime, "");
+        return;
+    }
+
+    char buf[8];
+    if (_use24h) {
+        snprintf(buf, sizeof(buf), "%02d:%02d", local->tm_hour, local->tm_min);
+    } else {
+        int h = local->tm_hour % 12;
+        if (h == 0) h = 12;
+        snprintf(buf, sizeof(buf), "%d:%02d", h, local->tm_min);
+    }
+    lv_label_set_text(_lblTime, buf);
 }
 
-void LvStatusBar::setBLEActive(bool active) {
-    _bleActive = active;
-    refreshIndicators();
-}
-
-void LvStatusBar::setWiFiActive(bool active) {
-    _wifiActive = active;
-    refreshIndicators();
-}
-
-void LvStatusBar::setTCPConnected(bool connected) {
-    _tcpConnected = connected;
-    refreshIndicators();
+void LvStatusBar::setGPSFix(bool hasFix) {
+    if (_gpsFix == hasFix) return;
+    _gpsFix = hasFix;
+    if (_lblGPS) {
+        lv_label_set_text(_lblGPS, hasFix ? "GPS" : "");
+    }
 }
 
 void LvStatusBar::setBatteryPercent(int pct) {
@@ -121,33 +131,10 @@ void LvStatusBar::setTransportMode(const char* mode) {
 
 void LvStatusBar::flashAnnounce() {
     _announceFlashEnd = millis() + 1000;
-    refreshIndicators();
 }
 
 void LvStatusBar::showToast(const char* msg, uint32_t durationMs) {
     lv_label_set_text(_lblToast, msg);
     _toastEnd = millis() + durationMs;
     lv_obj_clear_flag(_toast, LV_OBJ_FLAG_HIDDEN);
-}
-
-void LvStatusBar::refreshIndicators() {
-    // Bar 0 (short): LoRa — green=online, red=offline
-    if (_bars[0]) {
-        uint32_t col = _loraOnline ? Theme::PRIMARY : Theme::ERROR_CLR;
-        lv_obj_set_style_bg_color(_bars[0], lv_color_hex(col), 0);
-    }
-    // Bar 1 (medium): WiFi — green=connected, yellow=enabled but not connected, red=off
-    if (_bars[1]) {
-        uint32_t col = Theme::ERROR_CLR;
-        if (_wifiActive) col = Theme::PRIMARY;
-        else if (_wifiEnabled) col = Theme::WARNING_CLR;
-        lv_obj_set_style_bg_color(_bars[1], lv_color_hex(col), 0);
-    }
-    // Bar 2 (tall): TCP — green=connected, yellow=WiFi up but TCP down, red=off
-    if (_bars[2]) {
-        uint32_t col = Theme::ERROR_CLR;
-        if (_tcpConnected) col = Theme::PRIMARY;
-        else if (_wifiActive) col = Theme::WARNING_CLR;
-        lv_obj_set_style_bg_color(_bars[2], lv_color_hex(col), 0);
-    }
 }

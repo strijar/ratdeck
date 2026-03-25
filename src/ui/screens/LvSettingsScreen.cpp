@@ -368,6 +368,37 @@ void LvSettingsScreen::buildItems() {
             return String(modes[constrain((int)s.wifiMode, 0, 2)]);
         }});
 
+    // GPS & Time
+    int gpsStart = idx;
+#if HAS_GPS
+    _items.push_back({"GPS Time", SettingType::TOGGLE,
+        [&s]() { return s.gpsTimeEnabled ? 1 : 0; },
+        [&s](int v) { s.gpsTimeEnabled = (v != 0); },
+        [](int v) { return v ? String("ON") : String("OFF"); }});
+    idx++;
+    _items.push_back({"GPS Location", SettingType::TOGGLE,
+        [&s]() { return s.gpsLocationEnabled ? 1 : 0; },
+        [&s](int v) { s.gpsLocationEnabled = (v != 0); },
+        [](int v) { return v ? String("ON") : String("OFF"); }});
+    idx++;
+#endif
+    _items.push_back({"UTC Offset", SettingType::INTEGER,
+        [&s]() { return (int)s.utcOffset; }, [&s](int v) { s.utcOffset = (int8_t)v; },
+        [](int v) { char buf[8]; snprintf(buf, sizeof(buf), "UTC%+d", v); return String(buf); },
+        -12, 14, 1});
+    idx++;
+    _items.push_back({"24h Time", SettingType::TOGGLE,
+        [&s]() { return s.use24HourTime ? 1 : 0; },
+        [&s](int v) { s.use24HourTime = (v != 0); },
+        [](int v) { return v ? String("ON") : String("OFF"); }});
+    idx++;
+    _categories.push_back({"GPS/Time", gpsStart, idx - gpsStart,
+        [&s]() {
+            char buf[16];
+            snprintf(buf, sizeof(buf), "UTC%+d", s.utcOffset);
+            return String(buf);
+        }});
+
     // Audio
     int audioStart = idx;
     _items.push_back({"Audio", SettingType::TOGGLE,
@@ -1133,6 +1164,7 @@ void LvSettingsScreen::snapshotRebootSettings() {
     _rebootSnap.wifiSTASSID = s.wifiSTASSID;
     _rebootSnap.wifiSTAPassword = s.wifiSTAPassword;
     _rebootSnap.bleEnabled = s.bleEnabled;
+    _gpsSnapEnabled = s.gpsTimeEnabled;
 }
 
 bool LvSettingsScreen::rebootSettingsChanged() const {
@@ -1193,6 +1225,12 @@ void LvSettingsScreen::applyAndSave() {
     if (tcpChanged) {
         snapshotTCPSettings();
         if (_tcpChangeCb) _tcpChangeCb();
+    }
+
+    // Apply GPS toggle live (start/stop GPS UART)
+    if (s.gpsTimeEnabled != _gpsSnapEnabled) {
+        _gpsSnapEnabled = s.gpsTimeEnabled;
+        if (_gpsChangeCb) _gpsChangeCb(s.gpsTimeEnabled);
     }
 
     // Check if reboot-required settings changed
