@@ -1272,14 +1272,15 @@ void LvSettingsScreen::applyAndSave() {
         if (_gpsChangeCb) _gpsChangeCb(s.gpsTimeEnabled);
     }
 
-    // Check if reboot-required settings changed
+    // Check if reboot-required settings changed (show toast only on first detection)
+    bool wasRebootNeeded = _rebootNeeded;
     if (rebootSettingsChanged()) {
         _rebootNeeded = true;
     }
 
     if (_ui) {
-        if (_rebootNeeded) {
-            _ui->lvStatusBar().showToast("Reboot Required!", 2000);
+        if (_rebootNeeded && !wasRebootNeeded) {
+            _ui->lvStatusBar().showToast("WiFi changes apply on reboot", 2500);
         } else if (tcpChanged) {
             _ui->lvStatusBar().showToast("TCP Updated", 1200);
         } else {
