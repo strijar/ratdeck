@@ -47,6 +47,7 @@ void LvSettingsScreen::applyPreset(int presetIdx) {
     const auto& p = LV_PRESETS[presetIdx];
     s.loraSF = p.sf; s.loraBW = p.bw; s.loraCR = p.cr;
     s.loraTxPower = p.txPower; s.loraPreamble = p.preamble;
+    s.loraFrequency = REGION_FREQ[constrain(s.radioRegion, 0, REGION_COUNT - 1)];
 }
 
 bool LvSettingsScreen::isEditable(int idx) const {
@@ -230,6 +231,20 @@ void LvSettingsScreen::buildItems() {
     // Radio
     int radioStart = idx;
     {
+        // Region picker — always visible
+        SettingItem regionItem;
+        regionItem.label = "Region";
+        regionItem.type = SettingType::ENUM_CHOICE;
+        regionItem.getter = [&s]() { return (int)s.radioRegion; };
+        regionItem.setter = [this, &s](int v) {
+            s.radioRegion = constrain(v, 0, REGION_COUNT - 1);
+            if (_ui) _ui->lvStatusBar().showToast("Select a preset to apply frequency", 2500);
+        };
+        regionItem.minVal = 0; regionItem.maxVal = REGION_COUNT - 1; regionItem.step = 1;
+        regionItem.enumLabels = {REGION_LABELS[0], REGION_LABELS[1], REGION_LABELS[2], REGION_LABELS[3]};
+        _items.push_back(regionItem);
+        idx++;
+
         SettingItem presetItem;
         presetItem.label = "Preset";
         presetItem.type = SettingType::ENUM_CHOICE;
@@ -243,13 +258,25 @@ void LvSettingsScreen::buildItems() {
     // Custom radio parameters — only visible in Developer Mode
     if (s.devMode) {
         _items.push_back({"Frequency", SettingType::INTEGER,
-            [&s]() { return (int)(s.loraFrequency / 1000); },
-            [&s](int v) { s.loraFrequency = (uint32_t)v * 1000; },
+            [&s]() { return (int)(s.loraFrequency); },
+            [&s](int v) { s.loraFrequency = (uint32_t)v; },
             [](int v) -> String {
-                char buf[16]; snprintf(buf, sizeof(buf), "%d.%03d MHz", v / 1000, v % 1000);
+                char buf[20];
+                int mhz = v / 1000000;
+                int rem = v % 1000000;
+                if (rem == 0) {
+                    snprintf(buf, sizeof(buf), "%d MHz", mhz);
+                } else {
+                    char frac[8];
+                    snprintf(frac, sizeof(frac), "%06d", rem);
+                    int len = 6;
+                    while (len > 0 && frac[len - 1] == '0') len--;
+                    frac[len] = '\0';
+                    snprintf(buf, sizeof(buf), "%d.%s MHz", mhz, frac);
+                }
                 return String(buf);
             },
-            137000, 1020000, 125});
+            137000000, 1020000000, 125000});
         idx++;
         _items.push_back({"TX Power", SettingType::INTEGER,
             [&s]() { return s.loraTxPower; }, [&s](int v) { s.loraTxPower = v; },
@@ -282,7 +309,14 @@ void LvSettingsScreen::buildItems() {
         idx++;
     }
     _categories.push_back({"Radio", radioStart, idx - radioStart,
-        [this]() { int p = detectPreset(); return (p >= 0) ? String(LV_PRESETS[p].name) : String("Custom"); }});
+        [this]() {
+            int p = detectPreset();
+            auto& s = _cfg->settings();
+            String label = (p >= 0) ? String(LV_PRESETS[p].name) : String("Custom");
+            label += " ";
+            label += REGION_LABELS[constrain(s.radioRegion, 0, REGION_COUNT - 1)];
+            return label;
+        }});
 
     // Network
     int netStart = idx;

@@ -18,6 +18,7 @@ struct TCPEndpoint {
 
 struct UserSettings {
     // Radio
+    uint8_t radioRegion = REGION_AMERICAS;
     uint32_t loraFrequency = LORA_DEFAULT_FREQ;
     uint8_t loraSF = LORA_DEFAULT_SF;
     uint32_t loraBW = LORA_DEFAULT_BW;

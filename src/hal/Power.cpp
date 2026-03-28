@@ -91,6 +91,8 @@ void Power::loop() {
 
 void Power::setState(State newState) {
     if (newState == _state) return;
+    const char* names[] = {"ACTIVE", "DIMMED", "SCREEN_OFF"};
+    Serial.printf("[POWER] %s -> %s\n", names[_state], names[newState]);
     State oldState = _state;
     _state = newState;
 

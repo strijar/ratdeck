@@ -683,13 +683,12 @@ void setup() {
     ui.statusBar().setTransportMode("RatDeck");
     ui.lvStatusBar().setTransportMode("RatDeck");
 
-    // Keep UI alive during blocking radio TX (endPacket wait loop)
+    // Keep LVGL responsive during blocking radio operations (if screen is on)
     // Re-entrancy guard prevents nested lv_timer_handler() calls
     radio.setYieldCallback([]() {
         static bool inYield = false;
         if (inYield) return;
         inYield = true;
-        powerMgr.activity();  // Keep screen alive during TX
         if (powerMgr.isScreenOn()) {
             lv_timer_handler();
         }
@@ -847,6 +846,15 @@ void setup() {
             gps.setPosixTZ(tz);
         }
 #endif
+        // Warn if timezone suggests a different radio region
+        uint8_t tzRegion = TIMEZONE_TABLE[tzIdx].radioRegion;
+        if (tzRegion != userConfig.settings().radioRegion) {
+            char msg[64];
+            snprintf(msg, sizeof(msg), "TZ suggests %s region", REGION_LABELS[tzRegion]);
+            ui.lvStatusBar().showToast(msg, 3000);
+            Serial.printf("[REGION] Timezone suggests %s, current is %s\n",
+                REGION_LABELS[tzRegion], REGION_LABELS[userConfig.settings().radioRegion]);
+        }
         goHome();
     });
 

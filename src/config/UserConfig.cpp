@@ -11,6 +11,7 @@ bool UserConfig::parseJson(const String& json) {
         return false;
     }
 
+    _settings.radioRegion   = constrain((int)(doc["radio_region"] | 0), 0, REGION_COUNT - 1);
     _settings.loraFrequency = doc["lora_freq"] | (long)LORA_DEFAULT_FREQ;
     _settings.loraSF        = doc["lora_sf"]   | (int)LORA_DEFAULT_SF;
     _settings.loraBW        = doc["lora_bw"]   | (long)LORA_DEFAULT_BW;
@@ -75,6 +76,7 @@ bool UserConfig::parseJson(const String& json) {
 String UserConfig::serializeToJson() const {
     JsonDocument doc;
 
+    doc["radio_region"] = _settings.radioRegion;
     doc["lora_freq"] = _settings.loraFrequency;
     doc["lora_sf"]   = _settings.loraSF;
     doc["lora_bw"]   = _settings.loraBW;
