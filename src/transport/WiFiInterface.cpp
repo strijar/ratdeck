@@ -77,6 +77,11 @@ void WiFiInterface::stopFull() {
 void WiFiInterface::acceptClients() {
     WiFiClient newClient = _server.available();
     if (newClient) {
+        if ((int)_clients.size() >= MAX_AP_CLIENTS) {
+            newClient.stop();
+            Serial.printf("[WIFI] Client rejected (max %d reached)\n", MAX_AP_CLIENTS);
+            return;
+        }
         _clients.push_back(newClient);
         Serial.printf("[WIFI] Client connected (%d total)\n", (int)_clients.size());
     }

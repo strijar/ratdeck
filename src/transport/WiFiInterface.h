@@ -66,6 +66,8 @@ private:
     std::vector<WiFiClient> _clients;
     uint8_t _rxBuffer[600];
 
+    static constexpr int MAX_AP_CLIENTS = 4;
+
     static constexpr uint8_t FRAME_START = 0x7E;
     static constexpr uint8_t FRAME_ESC   = 0x7D;
     static constexpr uint8_t FRAME_XOR   = 0x20;
