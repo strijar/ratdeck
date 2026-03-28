@@ -31,11 +31,32 @@ private:
     void scrollToSelected();
     int getNodeIdxForEntry(int entry) const;
 
+    // Action modal helpers
+    enum class NodeAction { BROWSE, ACTION_MENU, NICKNAME_INPUT };
+    void showActionMenu(int nodeIdx);
+    void hideOverlay();
+    void showNicknameInput();
+    void updateMenuSelection();
+    void updateNicknameDisplay();
+
     AnnounceManager* _am = nullptr;
     class UIManager* _ui = nullptr;
     UserConfig* _cfg = nullptr;
     NodeSelectedCallback _onSelect;
     bool _confirmDelete = false;
+
+    // Action modal state
+    NodeAction _actionState = NodeAction::BROWSE;
+    int _menuIdx = 0;
+    int _actionNodeIdx = -1;
+    String _nicknameText;
+
+    // Overlay widgets
+    lv_obj_t* _overlay = nullptr;
+    lv_obj_t* _menuLabels[3] = {};
+    lv_obj_t* _nicknameBox = nullptr;
+    lv_obj_t* _nicknameLbl = nullptr;
+    lv_obj_t* _nicknameHint = nullptr;
     int _lastNodeCount = -1;
     int _lastContactCount = -1;
     int _selectedIdx = 0;

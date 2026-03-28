@@ -69,6 +69,59 @@ void LvNodesScreen::createUI(lv_obj_t* parent) {
     _lastContactCount = -1;
     updateSortOrder();
     syncVisibleRows();
+
+    // --- Action modal overlay (hidden initially) ---
+    _overlay = lv_obj_create(parent);
+    lv_obj_set_size(_overlay, 180, 100);
+    lv_obj_center(_overlay);
+    lv_obj_set_style_bg_color(_overlay, lv_color_hex(0x001100), 0);
+    lv_obj_set_style_bg_opa(_overlay, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(_overlay, 1, 0);
+    lv_obj_set_style_border_color(_overlay, lv_color_hex(Theme::PRIMARY), 0);
+    lv_obj_set_style_radius(_overlay, 6, 0);
+    lv_obj_set_style_pad_all(_overlay, 6, 0);
+    lv_obj_set_style_pad_row(_overlay, 2, 0);
+    lv_obj_set_layout(_overlay, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(_overlay, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(_overlay, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(_overlay, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(_overlay, LV_OBJ_FLAG_HIDDEN);
+
+    const char* menuText[] = {"Add Contact", "Message", "Back"};
+    for (int i = 0; i < 3; i++) {
+        _menuLabels[i] = lv_label_create(_overlay);
+        lv_obj_set_style_text_font(_menuLabels[i], &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(_menuLabels[i], lv_color_hex(Theme::PRIMARY), 0);
+        lv_label_set_text(_menuLabels[i], menuText[i]);
+    }
+
+    // Nickname input widgets (hidden in menu mode)
+    _nicknameBox = lv_obj_create(_overlay);
+    lv_obj_set_size(_nicknameBox, 166, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(_nicknameBox, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(_nicknameBox, 0, 0);
+    lv_obj_set_style_pad_all(_nicknameBox, 0, 0);
+    lv_obj_set_style_pad_row(_nicknameBox, 2, 0);
+    lv_obj_set_layout(_nicknameBox, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(_nicknameBox, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(_nicknameBox, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(_nicknameBox, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(_nicknameBox, LV_OBJ_FLAG_HIDDEN);
+
+    lv_obj_t* nickTitle = lv_label_create(_nicknameBox);
+    lv_obj_set_style_text_font(nickTitle, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(nickTitle, lv_color_hex(Theme::ACCENT), 0);
+    lv_label_set_text(nickTitle, "Enter nickname:");
+
+    _nicknameLbl = lv_label_create(_nicknameBox);
+    lv_obj_set_style_text_font(_nicknameLbl, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(_nicknameLbl, lv_color_hex(Theme::PRIMARY), 0);
+    lv_label_set_text(_nicknameLbl, "_");
+
+    _nicknameHint = lv_label_create(_nicknameBox);
+    lv_obj_set_style_text_font(_nicknameHint, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_color(_nicknameHint, lv_color_hex(Theme::MUTED), 0);
+    lv_label_set_text(_nicknameHint, "Enter=Save  Esc=Cancel");
 }
 
 void LvNodesScreen::onEnter() {
@@ -277,6 +330,62 @@ void LvNodesScreen::scrollToSelected() {
     }
 }
 
+// --- Action modal helpers ---
+
+void LvNodesScreen::showActionMenu(int nodeIdx) {
+    _actionNodeIdx = nodeIdx;
+    _menuIdx = 0;
+    _actionState = NodeAction::ACTION_MENU;
+    _nicknameText = "";
+    if (_overlay) {
+        for (int i = 0; i < 3; i++) lv_obj_clear_flag(_menuLabels[i], LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(_nicknameBox, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(_overlay, LV_OBJ_FLAG_HIDDEN);
+        updateMenuSelection();
+    }
+}
+
+void LvNodesScreen::hideOverlay() {
+    _actionState = NodeAction::BROWSE;
+    _actionNodeIdx = -1;
+    _nicknameText = "";
+    if (_overlay) lv_obj_add_flag(_overlay, LV_OBJ_FLAG_HIDDEN);
+}
+
+void LvNodesScreen::showNicknameInput() {
+    _actionState = NodeAction::NICKNAME_INPUT;
+    // Pre-fill with announce name
+    if (_am && _actionNodeIdx >= 0 && _actionNodeIdx < (int)_am->nodes().size()) {
+        _nicknameText = String(_am->nodes()[_actionNodeIdx].name.c_str());
+    }
+    for (int i = 0; i < 3; i++) lv_obj_add_flag(_menuLabels[i], LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(_nicknameBox, LV_OBJ_FLAG_HIDDEN);
+    updateNicknameDisplay();
+}
+
+void LvNodesScreen::updateMenuSelection() {
+    for (int i = 0; i < 3; i++) {
+        bool sel = (i == _menuIdx);
+        lv_obj_set_style_text_color(_menuLabels[i], lv_color_hex(
+            sel ? Theme::BG : Theme::PRIMARY), 0);
+        lv_obj_set_style_bg_color(_menuLabels[i], lv_color_hex(
+            sel ? Theme::PRIMARY : 0x001100), 0);
+        lv_obj_set_style_bg_opa(_menuLabels[i], LV_OPA_COVER, 0);
+        lv_obj_set_style_pad_left(_menuLabels[i], 8, 0);
+        lv_obj_set_style_pad_right(_menuLabels[i], 8, 0);
+        lv_obj_set_style_pad_top(_menuLabels[i], 2, 0);
+        lv_obj_set_style_pad_bottom(_menuLabels[i], 2, 0);
+        lv_obj_set_style_radius(_menuLabels[i], 3, 0);
+    }
+}
+
+void LvNodesScreen::updateNicknameDisplay() {
+    if (_nicknameLbl) {
+        String display = _nicknameText + "_";
+        lv_label_set_text(_nicknameLbl, display.c_str());
+    }
+}
+
 bool LvNodesScreen::handleLongPress() {
     if (!_am || _totalEntries == 0) return false;
     if (_selectedIdx < 0 || _selectedIdx >= _totalEntries) return false;
@@ -287,18 +396,88 @@ bool LvNodesScreen::handleLongPress() {
         _confirmDelete = true;
         if (_ui) _ui->lvStatusBar().showToast("Remove friend? Enter=Yes Esc=No", 5000);
     } else {
-        auto& mutableNode = const_cast<DiscoveredNode&>(node);
-        mutableNode.saved = true;
-        _am->saveContacts();
-        if (_ui) _ui->lvStatusBar().showToast("Added to friends!", 1200);
-        updateSortOrder();
-        syncVisibleRows();
+        showActionMenu(nodeIdx);
     }
     return true;
 }
 
 bool LvNodesScreen::handleKey(const KeyEvent& event) {
     if (!_am || _totalEntries == 0) return false;
+
+    // --- Nickname input mode ---
+    if (_actionState == NodeAction::NICKNAME_INPUT) {
+        if (event.enter || event.character == '\n' || event.character == '\r') {
+            // Save contact with nickname
+            if (_actionNodeIdx >= 0 && _actionNodeIdx < (int)_am->nodes().size()) {
+                auto& node = const_cast<DiscoveredNode&>(_am->nodes()[_actionNodeIdx]);
+                String finalName = _nicknameText;
+                finalName.trim();
+                if (finalName.isEmpty()) {
+                    // Fallback: announce name → hex hash
+                    if (!node.name.empty()) finalName = String(node.name.c_str());
+                    else finalName = String(node.hash.toHex().substr(0, 12).c_str());
+                }
+                node.name = finalName.c_str();
+                node.saved = true;
+                _am->saveContacts();
+                if (_ui) _ui->lvStatusBar().showToast("Contact saved!", 1200);
+                hideOverlay();
+                updateSortOrder();
+                syncVisibleRows();
+            } else {
+                hideOverlay();
+            }
+            return true;
+        }
+        if (event.character == 0x1B) { hideOverlay(); return true; }  // Esc
+        if (event.character == '\b' || event.character == 0x7F) {
+            if (_nicknameText.length() > 0) _nicknameText.remove(_nicknameText.length() - 1);
+            updateNicknameDisplay();
+            return true;
+        }
+        if (event.character >= 0x20 && event.character <= 0x7E && _nicknameText.length() < 16) {
+            _nicknameText += (char)event.character;
+            updateNicknameDisplay();
+            return true;
+        }
+        return true;  // Consume all keys in input mode
+    }
+
+    // --- Action menu mode ---
+    if (_actionState == NodeAction::ACTION_MENU) {
+        if (event.up) {
+            if (_menuIdx > 0) { _menuIdx--; updateMenuSelection(); }
+            return true;
+        }
+        if (event.down) {
+            if (_menuIdx < 2) { _menuIdx++; updateMenuSelection(); }
+            return true;
+        }
+        if (event.enter || event.character == '\n' || event.character == '\r') {
+            switch (_menuIdx) {
+                case 0:  // Add Contact
+                    showNicknameInput();
+                    break;
+                case 1:  // Message
+                    if (_actionNodeIdx >= 0 && _actionNodeIdx < (int)_am->nodes().size() && _onSelect) {
+                        std::string hex = _am->nodes()[_actionNodeIdx].hash.toHex();
+                        hideOverlay();
+                        _onSelect(hex);
+                    } else {
+                        hideOverlay();
+                    }
+                    break;
+                case 2:  // Back
+                    hideOverlay();
+                    break;
+            }
+            return true;
+        }
+        if (event.character == 0x1B) { hideOverlay(); return true; }  // Esc
+        return true;  // Consume all keys in menu mode
+    }
+
+    // --- Browse mode (normal) ---
 
     // Confirm delete mode
     if (_confirmDelete) {
@@ -324,7 +503,6 @@ bool LvNodesScreen::handleKey(const KeyEvent& event) {
     if (event.up) {
         int prev = _selectedIdx;
         _selectedIdx--;
-        // Skip headers
         while (_selectedIdx >= 0 && getNodeIdxForEntry(_selectedIdx) == -1) _selectedIdx--;
         if (_selectedIdx < 0) _selectedIdx = prev;
         if (_selectedIdx != prev) syncVisibleRows();
@@ -340,8 +518,8 @@ bool LvNodesScreen::handleKey(const KeyEvent& event) {
     }
     if (event.enter || event.character == '\n' || event.character == '\r') {
         int nodeIdx = getNodeIdxForEntry(_selectedIdx);
-        if (nodeIdx >= 0 && nodeIdx < (int)_am->nodes().size() && _onSelect) {
-            _onSelect(_am->nodes()[nodeIdx].hash.toHex());
+        if (nodeIdx >= 0 && nodeIdx < (int)_am->nodes().size()) {
+            showActionMenu(nodeIdx);
         }
         return true;
     }
