@@ -263,6 +263,7 @@ void LvSettingsScreen::buildItems() {
         presetItem.enumLabels = {};
         for (int i = 0; i < LV_NUM_PRESETS; i++)
             presetItem.enumLabels.push_back(LV_PRESETS[i].name);
+        presetItem.enumLabels.push_back("Custom");
         _items.push_back(presetItem);
         idx++;
     }
