@@ -95,6 +95,10 @@ void LvMessageView::createUI(lv_obj_t* parent) {
     lv_obj_set_style_text_color(sendLbl, lv_color_hex(Theme::PRIMARY), 0);
     lv_label_set_text(sendLbl, "Send");
     lv_obj_center(sendLbl);
+    lv_obj_add_event_cb(_btnSend, [](lv_event_t* e) {
+        auto* self = (LvMessageView*)lv_event_get_user_data(e);
+        self->sendCurrentMessage();
+    }, LV_EVENT_CLICKED, this);
 }
 
 void LvMessageView::destroyUI() {
