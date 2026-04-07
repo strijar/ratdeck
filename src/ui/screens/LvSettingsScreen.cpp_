@@ -688,92 +688,21 @@ void LvSettingsScreen::buildItems() {
 
 void LvSettingsScreen::createUI(lv_obj_t* parent) {
     _screen = parent;
-    _scrollContainer = parent;
+    lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_color(parent, lv_color_hex(Theme::BG), 0);
+    lv_obj_set_style_pad_all(parent, 0, 0);
 
-    _menu = lv_menu_create(parent);
-    lv_obj_set_size(_menu, Theme::CONTENT_W, Theme::CONTENT_H);
-
-    // Modify the header
-
-    lv_obj_set_style_pad_column(lv_menu_get_main_header(_menu), 10, 0);
-
-    lv_obj_t* back_btn = lv_menu_get_main_header_back_btn(_menu);
-    lv_obj_clean(back_btn);
-
-    lv_obj_add_style(back_btn, LvTheme::styleBtn(), 0);
-    lv_obj_add_style(back_btn, LvTheme::styleBtnFocused(), LV_STATE_FOCUSED);
-    lv_obj_add_style(back_btn, LvTheme::styleBtnPressed(), LV_STATE_PRESSED);
-    lv_obj_set_style_pad_all(back_btn, 2, 0);
-
-    lv_obj_t* back_btn_label = lv_label_create(back_btn);
-    lv_label_set_text(back_btn_label, "Back");
-
-    // Make menu
-
-    _root_page = lv_menu_page_create(_menu, NULL);
-
-    pageDevice();
-    pageDisplay();
-    pageRadio();
-    pageNetwork();
-    pageGPS();
-    pageAudio();
-    pageInfo();
-    pageSystem();
-
-    lv_menu_set_page(_menu, _root_page);
-}
-
-lv_obj_t* LvSettingsScreen::subPage(char* text) {
-    lv_obj_t*   sub_page = lv_menu_page_create(_menu, text);
-    lv_obj_t*   sub_cont = lv_menu_section_create(sub_page);
-    lv_obj_t*   cont = lv_menu_cont_create(_root_page);
-    lv_obj_t*   label = lv_label_create(cont);
-
-    lv_label_set_text(label, text);
-    lv_obj_set_style_pad_all(label, 3, 0);
-
-    lv_menu_set_load_page_event(_menu, cont, sub_page);
-
-    return sub_cont;
-}
-
-void LvSettingsScreen::pageDevice() {
-    lv_obj_t*   cont = subPage("Device");
-    lv_obj_t*   label = lv_label_create(cont);
-
-    lv_label_set_text(label, "Hello Device");
-}
-
-void LvSettingsScreen::pageDisplay() {
-    lv_obj_t*   cont = subPage("Display & Input");
-    lv_obj_t*   label = lv_label_create(cont);
-
-    lv_label_set_text(label, "Hello Display");
-}
-
-void LvSettingsScreen::pageRadio() {
-    lv_obj_t*   cont = subPage("Radio");
-}
-
-void LvSettingsScreen::pageNetwork() {
-    lv_obj_t*   cont = subPage("Network");
-}
-
-void LvSettingsScreen::pageGPS() {
-    lv_obj_t*   cont = subPage("GPS/Time");
-}
-
-void LvSettingsScreen::pageAudio() {
-    lv_obj_t*   cont = subPage("Audio");
-}
-
-void LvSettingsScreen::pageInfo() {
-    lv_obj_t*   cont = subPage("Info");
-}
-
-void LvSettingsScreen::pageSystem() {
-    lv_obj_t*   cont = subPage("System");
+    _scrollContainer = lv_obj_create(parent);
+    lv_obj_set_size(_scrollContainer, lv_pct(100), lv_pct(100));
+    lv_obj_set_pos(_scrollContainer, 0, 0);
+    lv_obj_set_style_bg_color(_scrollContainer, lv_color_hex(Theme::BG), 0);
+    lv_obj_set_style_bg_opa(_scrollContainer, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(_scrollContainer, 0, 0);
+    lv_obj_set_style_pad_all(_scrollContainer, 0, 0);
+    lv_obj_set_style_pad_row(_scrollContainer, 0, 0);
+    lv_obj_set_style_radius(_scrollContainer, 0, 0);
+    lv_obj_set_layout(_scrollContainer, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(_scrollContainer, LV_FLEX_FLOW_COLUMN);
 }
 
 void LvSettingsScreen::onEnter() {

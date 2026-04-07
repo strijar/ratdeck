@@ -80,6 +80,17 @@ public:
     const char* title() const override { return "Settings"; }
 
 private:
+    lv_obj_t* subPage(char* text);
+
+    void pageDevice();
+    void pageDisplay();
+    void pageRadio();
+    void pageNetwork();
+    void pageGPS();
+    void pageAudio();
+    void pageInfo();
+    void pageSystem();
+
     void buildItems();
     void applyAndSave();
     void applyPreset(int presetIdx);
@@ -170,6 +181,10 @@ private:
     uint8_t _kbBrightness = 0;
 
     // LVGL widgets
+    lv_obj_t* _menu = nullptr;
+    lv_obj_t* _root_page = nullptr;
+    lv_obj_t* _root_section = nullptr;
+
     lv_obj_t* _scrollContainer = nullptr;
     std::vector<lv_obj_t*> _rowObjs;
     lv_obj_t* _editValueLbl = nullptr;  // Cached for in-place updates during text/freq editing

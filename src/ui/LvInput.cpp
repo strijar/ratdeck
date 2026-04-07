@@ -192,6 +192,9 @@ void init(Keyboard* kb, Trackball* tb, TouchInput* touch) {
     lv_indev_t* touchIndev = lv_indev_drv_register(&touchDrv);
     lv_indev_set_group(touchIndev, s_group);
 
+    touchDrv.gesture_limit = 50; 
+    touchDrv.gesture_min_velocity = 80;
+
     // Touch cursor: semi-transparent center with brand green ring
     s_cursor = lv_obj_create(lv_layer_sys());
     lv_obj_set_size(s_cursor, 14, 14);

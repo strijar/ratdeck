@@ -55,7 +55,7 @@ extern const lv_font_t lv_font_ratdeck_14;
 #define LV_USE_BTNMATRIX  1  // Required by LVGL calendar/msgbox internals
 #define LV_USE_TEXTAREA   1
 #define LV_USE_LIST       0
-#define LV_USE_MENU       0
+#define LV_USE_MENU       1
 #define LV_USE_BAR        1
 #define LV_USE_SLIDER     0
 #define LV_USE_SWITCH     0
@@ -63,7 +63,7 @@ extern const lv_font_t lv_font_ratdeck_14;
 #define LV_USE_ROLLER     1
 #define LV_USE_TABLE      0
 #define LV_USE_TABVIEW    1
-#define LV_USE_IMG        0
+#define LV_USE_IMG        1
 #define LV_USE_LINE       0
 #define LV_USE_ARC        0
 #define LV_USE_SPINNER    0
