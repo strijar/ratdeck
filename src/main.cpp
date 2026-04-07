@@ -22,7 +22,7 @@
 #include "input/InputManager.h"
 #include "input/HotkeyManager.h"
 #include "ui/UIManager.h"
-#include "ui/LvTabBar.h"
+#include "ui/LvTabView.h"
 #include "ui/LvInput.h"
 #include "ui/screens/LvBootScreen.h"
 #include "ui/screens/LvHomeScreen.h"
@@ -112,7 +112,7 @@ LvTimezoneScreen lvTimezoneScreen;
 LvDataCleanScreen lvDataCleanScreen;
 
 // Tab-screen mapping (4 tabs) — LVGL versions
-LvScreen* lvTabScreens[LvTabBar::TAB_COUNT] = {};
+LvScreen* lvTabScreens[LvTabView::TAB_COUNT] = {};
 
 // --- State ---
 bool radioOnline = false;
@@ -218,15 +218,15 @@ void onHotkeyHelp() {
     lvHelpOverlay.toggle();
 }
 void onHotkeyMessages() {
-    ui.lvTabBar().setActiveTab(LvTabBar::TAB_MSGS);
+//    ui.lvTabBar().setActiveTab(LvTabBar::TAB_MSGS);
     ui.setScreen(&lvMessagesScreen);
 }
 void onHotkeyNewMsg() {
-    ui.lvTabBar().setActiveTab(LvTabBar::TAB_MSGS);
+//    ui.lvTabBar().setActiveTab(LvTabBar::TAB_MSGS);
     ui.setScreen(&lvMessagesScreen);
 }
 void onHotkeySettings() {
-    ui.lvTabBar().setActiveTab(LvTabBar::TAB_SETTINGS);
+//    ui.lvTabBar().setActiveTab(LvTabBar::TAB_SETTINGS);
     ui.setScreen(&lvSettingsScreen);
 }
 void onHotkeyAnnounce() {
@@ -444,11 +444,6 @@ void setup() {
     hotkeys.registerHotkey('d', "Diagnostics", onHotkeyDiag);
     hotkeys.registerHotkey('t', "Radio Test", onHotkeyRadioTest);
     hotkeys.registerHotkey('r', "RSSI Monitor", onHotkeyRssiMonitor);
-    hotkeys.setTabCycleCallback([](int dir) {
-        ui.lvTabBar().cycleTab(dir);
-        int tab = ui.lvTabBar().getActiveTab();
-        if (lvTabScreens[tab]) ui.setScreen(lvTabScreens[tab]);
-    });
     lvBootScreen.setProgress(0.58f, "Hotkeys registered");
     // (LVGL boot renders via lv_timer_handler in setProgress)
 
@@ -504,7 +499,7 @@ void setup() {
     lxmf.begin(&rns, &messageStore);
     lxmf.setMessageCallback([](const LXMFMessage& msg) {
         Serial.printf("[LXMF] Message from %s\n", msg.sourceHash.toHex().substr(0, 8).c_str());
-        ui.lvTabBar().setUnreadCount(LvTabBar::TAB_MSGS, lxmf.unreadCount());
+        ui.lvTabView().setUnreadCount(LvTabView::TAB_MSGS, lxmf.unreadCount());
         audio.playMessage();
     });
     // Pre-cache unread counts so first tab switch to Messages is instant
@@ -711,7 +706,7 @@ void setup() {
     lvContactsScreen.setUIManager(&ui);
     lvContactsScreen.setNodeSelectedCallback([](const std::string& peerHex) {
         lvMessageView.setPeerHex(peerHex);
-        ui.lvTabBar().setActiveTab(LvTabBar::TAB_MSGS);
+//        ui.lvTabBar().setActiveTab(LvTabBar::TAB_MSGS);
         ui.setScreen(&lvMessageView);
     });
 
@@ -720,7 +715,7 @@ void setup() {
     lvNodesScreen.setUserConfig(&userConfig);
     lvNodesScreen.setNodeSelectedCallback([](const std::string& peerHex) {
         lvMessageView.setPeerHex(peerHex);
-        ui.lvTabBar().setActiveTab(LvTabBar::TAB_MSGS);
+//        ui.lvTabBar().setActiveTab(LvTabBar::TAB_MSGS);
         ui.setScreen(&lvMessageView);
     });
 
@@ -780,16 +775,12 @@ void setup() {
     // LVGL help overlay
     lvHelpOverlay.create();
 
-    // Tab bar callbacks — LVGL
-    lvTabScreens[LvTabBar::TAB_HOME]     = &lvHomeScreen;
-    lvTabScreens[LvTabBar::TAB_CONTACTS] = &lvContactsScreen;
-    lvTabScreens[LvTabBar::TAB_MSGS]     = &lvMessagesScreen;
-    lvTabScreens[LvTabBar::TAB_NODES]    = &lvNodesScreen;
-    lvTabScreens[LvTabBar::TAB_SETTINGS] = &lvSettingsScreen;
-
-    ui.lvTabBar().setTabCallback([](int tab) {
-        if (lvTabScreens[tab]) ui.setScreen(lvTabScreens[tab]);
-    });
+    // Tabs
+    ui.lvTabView().addScreen(&lvHomeScreen);
+    ui.lvTabView().addScreen(&lvContactsScreen);
+    ui.lvTabView().addScreen(&lvMessagesScreen);
+    ui.lvTabView().addScreen(&lvNodesScreen);
+    ui.lvTabView().addScreen(&lvSettingsScreen);
 
     // Data clean screen (first boot only — when SD has old data)
     lvDataCleanScreen.setDoneCallback([](bool wipe) {
@@ -813,7 +804,7 @@ void setup() {
     auto goHome = []() {
         ui.setBootMode(false);
         ui.setScreen(&lvHomeScreen);
-        ui.lvTabBar().setActiveTab(LvTabBar::TAB_HOME);
+//        ui.lvTabBar().setActiveTab(LvTabBar::TAB_HOME);
         announceWithName();
         lastAutoAnnounce = millis();
         Serial.println("[BOOT] Initial announce sent");
@@ -946,22 +937,6 @@ void loop() {
 
             // Feed to LVGL input system only if the screen didn't consume it
             if (!consumed) LvInput::feedKey(evt);
-
-            // Tab cycling: ,=left /=right OR trackball left/right (only if screen didn't consume)
-            if (!consumed && !evt.ctrl) {
-                bool tabLeft  = (evt.character == ',') || evt.left;
-                bool tabRight = (evt.character == '/') || evt.right;
-                if (tabLeft) {
-                    ui.lvTabBar().cycleTab(-1);
-                    int tab = ui.lvTabBar().getActiveTab();
-                    if (lvTabScreens[tab]) ui.setScreen(lvTabScreens[tab]);
-                }
-                if (tabRight) {
-                    ui.lvTabBar().cycleTab(1);
-                    int tab = ui.lvTabBar().getActiveTab();
-                    if (lvTabScreens[tab]) ui.setScreen(lvTabScreens[tab]);
-                }
-            }
         }
     }
 

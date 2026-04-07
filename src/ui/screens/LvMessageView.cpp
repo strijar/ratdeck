@@ -1,7 +1,7 @@
 #include "LvMessageView.h"
 #include "ui/Theme.h"
 #include "ui/LvTheme.h"
-#include "ui/LvTabBar.h"
+#include "ui/LvTabView.h"
 #include "reticulum/LXMFManager.h"
 #include "reticulum/AnnounceManager.h"
 #include <Arduino.h>
@@ -120,7 +120,7 @@ void LvMessageView::onEnter() {
     if (_lxmf) {
         _lxmf->markRead(_peerHex);
         // Update unread badge on Messages tab
-        if (_ui) _ui->lvTabBar().setUnreadCount(LvTabBar::TAB_MSGS, _lxmf->unreadCount());
+        if (_ui) _ui->lvTabView().setUnreadCount(LvTabView::TAB_MSGS, _lxmf->unreadCount());
         // Register status callback — partial update without full rebuild
         std::string peer = _peerHex;
         _lxmf->setStatusCallback([this, peer](const std::string& peerHex, double, LXMFStatus newStatus) {
@@ -186,7 +186,7 @@ void LvMessageView::refreshUI() {
         }
         // Mark as read since user is actively viewing this conversation
         _lxmf->markRead(_peerHex);
-        if (_ui) _ui->lvTabBar().setUnreadCount(LvTabBar::TAB_MSGS, _lxmf->unreadCount());
+        if (_ui) _ui->lvTabView().setUnreadCount(LvTabView::TAB_MSGS, _lxmf->unreadCount());
     }
 }
 

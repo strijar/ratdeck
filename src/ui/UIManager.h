@@ -2,7 +2,7 @@
 
 #include <lvgl.h>
 #include "LvStatusBar.h"
-#include "LvTabBar.h"
+#include "LvTabView.h"
 #include "hal/Keyboard.h"
 
 // LVGL screen base class
@@ -34,7 +34,7 @@ public:
 
     // Component access
     LvStatusBar& lvStatusBar() { return _lvStatusBar; }
-    LvTabBar& lvTabBar() { return _lvTabBar; }
+    LvTabView& lvTabView() { return _lvTabView; }
 
     // Update data (called periodically)
     void update();
@@ -56,7 +56,7 @@ public:
 private:
     // LVGL components
     LvStatusBar _lvStatusBar;
-    LvTabBar _lvTabBar;
+    LvTabView _lvTabView;
     LvScreen* _currentLvScreen = nullptr;
     lv_obj_t* _lvContent = nullptr;
 

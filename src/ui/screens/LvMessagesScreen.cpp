@@ -258,7 +258,7 @@ bool LvMessagesScreen::handleKey(const KeyEvent& event) {
                 messageStore.refreshConversations();
                 if (_ui) {
                     _ui->lvStatusBar().showToast("Chat deleted", 1200);
-                    _ui->lvTabBar().setUnreadCount(LvTabBar::TAB_MSGS, _lxmf->unreadCount());
+                    _ui->lvTabView().setUnreadCount(LvTabView::TAB_MSGS, _lxmf->unreadCount());
                 }
                 _lastConvCount = -1;
                 rebuildList();

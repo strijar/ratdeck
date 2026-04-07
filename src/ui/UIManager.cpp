@@ -23,23 +23,14 @@ void UIManager::begin() {
     // Create LVGL status bar (top)
     _lvStatusBar.create(scr);
 
-    // Create LVGL tab bar (bottom)
-    _lvTabBar.create(scr);
-
-    // Create content area between status bar and tab bar
-    _lvContent = lv_obj_create(scr);
-    lv_obj_set_pos(_lvContent, 0, Theme::STATUS_BAR_H);
-    lv_obj_set_size(_lvContent, Theme::CONTENT_W, Theme::CONTENT_H);
-    lv_obj_set_style_bg_color(_lvContent, lv_color_hex(Theme::BG), 0);
-    lv_obj_set_style_bg_opa(_lvContent, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(_lvContent, 0, 0);
-    lv_obj_set_style_pad_all(_lvContent, 0, 0);
-    lv_obj_set_style_radius(_lvContent, 0, 0);
+    // Create LVGL tab view
+    _lvTabView.create(scr);
 
     Serial.println("[UI] LVGL UI structure created");
 }
 
 void UIManager::setScreen(LvScreen* screen) {
+    /*
     // Transition from previous LVGL screen
     if (_currentLvScreen) {
         _currentLvScreen->onExit();
@@ -61,27 +52,28 @@ void UIManager::setScreen(LvScreen* screen) {
         _currentLvScreen->createUI(_lvContent);
         _currentLvScreen->onEnter();
     }
+    */
 }
 
 void UIManager::setBootMode(bool boot) {
     _bootMode = boot;
     if (boot) {
         lv_obj_add_flag(_lvStatusBar.obj(), LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(_lvTabBar.obj(), LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(_lvTabView.obj(), LV_OBJ_FLAG_HIDDEN);
         // In boot mode, content area is full screen
-        lv_obj_set_pos(_lvContent, 0, 0);
-        lv_obj_set_size(_lvContent, Theme::SCREEN_W, Theme::SCREEN_H);
+//        lv_obj_set_pos(_lvContent, 0, 0);
+//        lv_obj_set_size(_lvContent, Theme::SCREEN_W, Theme::SCREEN_H);
     } else {
         lv_obj_clear_flag(_lvStatusBar.obj(), LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(_lvTabBar.obj(), LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_pos(_lvContent, 0, Theme::STATUS_BAR_H);
-        lv_obj_set_size(_lvContent, Theme::CONTENT_W, Theme::CONTENT_H);
+        lv_obj_clear_flag(_lvTabView.obj(), LV_OBJ_FLAG_HIDDEN);
+//        lv_obj_set_pos(_lvContent, 0, Theme::STATUS_BAR_H);
+//        lv_obj_set_size(_lvContent, Theme::CONTENT_W, Theme::CONTENT_H);
     }
 }
 
 void UIManager::update() {
     _lvStatusBar.update();
-    if (_currentLvScreen) _currentLvScreen->refreshUI();
+//    if (_currentLvScreen) _currentLvScreen->refreshUI();
 }
 
 void UIManager::forceRedraw() {
