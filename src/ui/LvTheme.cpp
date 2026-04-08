@@ -14,8 +14,6 @@ static lv_style_t s_btn;
 static lv_style_t s_btnPressed;
 static lv_style_t s_bar;
 static lv_style_t s_barIndicator;
-static lv_style_t s_switch;
-static lv_style_t s_switchChecked;
 static lv_style_t s_textarea;
 static lv_style_t s_list;
 static lv_style_t s_listBtn;
@@ -30,6 +28,12 @@ static lv_style_t s_sectionHeader;
 static lv_style_t s_modal;
 static lv_style_t s_scrollbar;
 static lv_style_t s_roller;
+
+static lv_style_t s_switch;
+static lv_style_t s_switchIndicator;
+static lv_style_t s_switchIndicatorChecked;
+static lv_style_t s_switchKnob;
+static lv_style_t s_switchKnobChecked;
 
 void init(lv_disp_t* disp) {
     // Screen background (LV_USE_THEME_DEFAULT is disabled in lv_conf.h,
@@ -80,15 +84,6 @@ void init(lv_disp_t* disp) {
     lv_style_set_bg_color(&s_barIndicator, lv_color_hex(Theme::PRIMARY));
     lv_style_set_bg_opa(&s_barIndicator, LV_OPA_COVER);
     lv_style_set_radius(&s_barIndicator, 3);
-
-    // Switch (LV_USE_SWITCH currently 0; kept for future lv_menu rewrite)
-    lv_style_init(&s_switch);
-    lv_style_set_bg_color(&s_switch, lv_color_hex(Theme::BORDER));
-    lv_style_set_bg_opa(&s_switch, LV_OPA_COVER);
-    lv_style_set_radius(&s_switch, LV_RADIUS_CIRCLE);
-
-    lv_style_init(&s_switchChecked);
-    lv_style_set_bg_color(&s_switchChecked, lv_color_hex(Theme::PRIMARY));
 
     // Textarea
     lv_style_init(&s_textarea);
@@ -191,6 +186,26 @@ void init(lv_disp_t* disp) {
     lv_style_set_text_font(&s_roller, &lv_font_ratdeck_14);
     lv_style_set_border_width(&s_roller, 0);
 
+    // Switch
+
+    lv_style_init(&s_switch);
+    lv_style_set_max_height(&s_switch, 14);
+    lv_style_set_max_width(&s_switch, 14 * 2);
+    lv_style_set_pad_all(&s_switch, 1);
+    lv_style_set_bg_color(&s_switch, lv_color_hex(Theme::BORDER));
+    lv_style_set_bg_opa(&s_switch, LV_OPA_COVER);
+    lv_style_set_radius(&s_switch, LV_RADIUS_CIRCLE);
+
+    lv_style_init(&s_switchIndicator);
+    lv_style_init(&s_switchIndicatorChecked);
+
+    lv_style_init(&s_switchKnob);
+    lv_style_set_bg_color(&s_switchKnob, lv_color_hex(Theme::PRIMARY));
+    lv_style_set_bg_opa(&s_switchKnob, LV_OPA_COVER);
+    lv_style_set_radius(&s_switchKnob, LV_RADIUS_CIRCLE);
+
+    lv_style_init(&s_switchKnobChecked);
+
     // Apply screen style to default theme
     lv_obj_add_style(lv_scr_act(), &s_screen, 0);
 
@@ -206,8 +221,6 @@ lv_style_t* styleBtn()              { return &s_btn; }
 lv_style_t* styleBtnPressed()       { return &s_btnPressed; }
 lv_style_t* styleBar()              { return &s_bar; }
 lv_style_t* styleBarIndicator()     { return &s_barIndicator; }
-lv_style_t* styleSwitch()           { return &s_switch; }
-lv_style_t* styleSwitchChecked()    { return &s_switchChecked; }
 lv_style_t* styleTextarea()         { return &s_textarea; }
 lv_style_t* styleList()             { return &s_list; }
 lv_style_t* styleListBtn()          { return &s_listBtn; }
@@ -222,5 +235,11 @@ lv_style_t* styleSectionHeader()    { return &s_sectionHeader; }
 lv_style_t* styleModal()            { return &s_modal; }
 lv_style_t* styleScrollbar()        { return &s_scrollbar; }
 lv_style_t* styleRoller()           { return &s_roller; }
+
+lv_style_t* styleSwitch()                   { return &s_switch; }
+lv_style_t* styleSwitchIndicator()          { return &s_switchIndicator; }
+lv_style_t* styleSwitchIndicatorChecked()   { return &s_switchIndicatorChecked; }
+lv_style_t* styleSwitchKnob()               { return &s_switchKnob; }
+lv_style_t* styleSwitchKnobChecked()        { return &s_switchKnobChecked; }
 
 }  // namespace LvTheme

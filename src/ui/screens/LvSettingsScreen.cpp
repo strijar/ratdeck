@@ -703,7 +703,11 @@ void LvSettingsScreen::createUI(lv_obj_t* parent) {
     lv_obj_add_style(back_btn, LvTheme::styleBtn(), 0);
     lv_obj_add_style(back_btn, LvTheme::styleBtnFocused(), LV_STATE_FOCUSED);
     lv_obj_add_style(back_btn, LvTheme::styleBtnPressed(), LV_STATE_PRESSED);
-    lv_obj_set_style_pad_all(back_btn, 2, 0);
+
+    lv_obj_set_style_pad_top(back_btn, 0, 0);
+    lv_obj_set_style_pad_bottom(back_btn, 0, 0);
+    lv_obj_set_style_pad_left(back_btn, 5, 0);
+    lv_obj_set_style_pad_right(back_btn, 5, 0);
 
     lv_obj_t* back_btn_label = lv_label_create(back_btn);
     lv_label_set_text(back_btn_label, "Back");
@@ -727,6 +731,7 @@ void LvSettingsScreen::createUI(lv_obj_t* parent) {
 lv_obj_t* LvSettingsScreen::subPage(char* text) {
     lv_obj_t*   sub_page = lv_menu_page_create(_menu, text);
     lv_obj_t*   sub_cont = lv_menu_section_create(sub_page);
+
     lv_obj_t*   cont = lv_menu_cont_create(_root_page);
     lv_obj_t*   label = lv_label_create(cont);
 
@@ -736,6 +741,40 @@ lv_obj_t* LvSettingsScreen::subPage(char* text) {
     lv_menu_set_load_page_event(_menu, cont, sub_page);
 
     return sub_cont;
+}
+
+lv_obj_t* LvSettingsScreen::createText(lv_obj_t* parent, const char* text) {
+    lv_obj_t*   obj = lv_menu_cont_create(parent);
+    lv_obj_t*   label = lv_label_create(obj);
+
+    lv_obj_set_style_pad_all(obj, 5, 0);
+
+    lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+    lv_obj_add_flag(obj, LV_OBJ_FLAG_EVENT_BUBBLE);
+
+    lv_group_add_obj(lv_group_get_default(), obj);
+
+    lv_label_set_text(label, text);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_style_text_line_space(label, 0, 0);
+    lv_obj_set_flex_grow(label, 1);
+
+    return obj;
+}
+
+void LvSettingsScreen::createSwitch(lv_obj_t* parent, const char* text, bool* val) {
+    lv_obj_t*   obj = createText(parent, text);
+    lv_obj_t*   sw = lv_switch_create(obj);
+
+    lv_obj_add_style(sw, LvTheme::styleSwitch(), LV_PART_MAIN);
+    lv_obj_add_style(sw, LvTheme::styleSwitchIndicator(), LV_PART_INDICATOR);
+    lv_obj_add_style(sw, LvTheme::styleSwitchKnob(), LV_PART_KNOB);
+    lv_obj_add_style(sw, LvTheme::styleSwitchIndicatorChecked(), LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_add_style(sw, LvTheme::styleSwitchKnobChecked(), LV_PART_KNOB | LV_STATE_CHECKED);
+
+    if (*val) {
+        lv_obj_add_state(sw, LV_STATE_CHECKED);
+    }
 }
 
 void LvSettingsScreen::pageDevice() {
@@ -766,6 +805,9 @@ void LvSettingsScreen::pageGPS() {
 
 void LvSettingsScreen::pageAudio() {
     lv_obj_t*   cont = subPage("Audio");
+    auto&       s = _cfg->settings();
+
+    createSwitch(cont, "Enabled", &s.audioEnabled);
 }
 
 void LvSettingsScreen::pageInfo() {

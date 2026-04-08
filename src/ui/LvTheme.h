@@ -16,8 +16,6 @@ lv_style_t* styleBtn();
 lv_style_t* styleBtnPressed();
 lv_style_t* styleBar();
 lv_style_t* styleBarIndicator();
-lv_style_t* styleSwitch();
-lv_style_t* styleSwitchChecked();
 lv_style_t* styleTextarea();
 lv_style_t* styleList();
 lv_style_t* styleListBtn();
@@ -32,5 +30,11 @@ lv_style_t* styleSectionHeader();
 lv_style_t* styleModal();
 lv_style_t* styleScrollbar();
 lv_style_t* styleRoller();
+
+lv_style_t* styleSwitch();
+lv_style_t* styleSwitchIndicator();
+lv_style_t* styleSwitchIndicatorChecked();
+lv_style_t* styleSwitchKnob();
+lv_style_t* styleSwitchKnobChecked();
 
 }  // namespace LvTheme

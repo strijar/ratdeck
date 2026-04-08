@@ -82,6 +82,9 @@ public:
 private:
     lv_obj_t* subPage(char* text);
 
+    lv_obj_t* createText(lv_obj_t* parent, const char* text);
+    void createSwitch(lv_obj_t* parent, const char* text, bool* val);
+
     void pageDevice();
     void pageDisplay();
     void pageRadio();
