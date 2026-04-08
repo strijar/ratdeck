@@ -54,6 +54,18 @@ struct SettingsCategory {
     std::function<String()> summary;
 };
 
+struct BoolItem {
+    bool*   data;
+    std::function<void(bool)> update;
+};
+
+struct Int32Item {
+    int32_t*    data;
+    int32_t     min;
+    int32_t     max;
+    std::function<void(int32_t)> update;
+};
+
 class LvSettingsScreen : public LvScreen {
 public:
     void createUI(lv_obj_t* parent) override;
@@ -83,7 +95,8 @@ private:
     lv_obj_t* subPage(char* text);
 
     lv_obj_t* createText(lv_obj_t* parent, const char* text);
-    void createSwitch(lv_obj_t* parent, const char* text, bool* val);
+    void createSwitch(lv_obj_t* parent, const char* text, BoolItem item);
+    void createSlider(lv_obj_t* parent, const char* text, Int32Item item);
 
     void pageDevice();
     void pageDisplay();

@@ -21,7 +21,6 @@ lv_style_t* styleList();
 lv_style_t* styleListBtn();
 lv_style_t* styleListBtnFocused();
 lv_style_t* styleDropdown();
-lv_style_t* styleSlider();
 
 // Style accessors — new (6)
 lv_style_t* styleBtnFocused();
@@ -36,5 +35,9 @@ lv_style_t* styleSwitchIndicator();
 lv_style_t* styleSwitchIndicatorChecked();
 lv_style_t* styleSwitchKnob();
 lv_style_t* styleSwitchKnobChecked();
+
+lv_style_t* styleSlider();
+lv_style_t* styleSliderIndicator();
+lv_style_t* styleSliderKnob();
 
 }  // namespace LvTheme

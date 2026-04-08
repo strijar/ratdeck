@@ -57,7 +57,7 @@ extern const lv_font_t lv_font_ratdeck_14;
 #define LV_USE_LIST       0
 #define LV_USE_MENU       1
 #define LV_USE_BAR        1
-#define LV_USE_SLIDER     0
+#define LV_USE_SLIDER     1
 #define LV_USE_SWITCH     1
 #define LV_USE_DROPDOWN   1  // Required by LVGL calendar internals
 #define LV_USE_ROLLER     1

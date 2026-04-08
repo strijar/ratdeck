@@ -56,7 +56,6 @@ void LvHomeScreen::createUI(lv_obj_t* parent) {
     lv_obj_clear_flag(_btnAnnounce, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
 
     lv_obj_t* btnLbl = lv_label_create(_btnAnnounce);
-    lv_obj_set_style_text_font(btnLbl, &lv_font_ratdeck_10, 0);
     lv_label_set_text(btnLbl, "Announce");
     lv_obj_center(btnLbl);
 

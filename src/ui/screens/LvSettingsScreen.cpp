@@ -762,7 +762,7 @@ lv_obj_t* LvSettingsScreen::createText(lv_obj_t* parent, const char* text) {
     return obj;
 }
 
-void LvSettingsScreen::createSwitch(lv_obj_t* parent, const char* text, bool* val) {
+void LvSettingsScreen::createSwitch(lv_obj_t* parent, const char* text, BoolItem item) {
     lv_obj_t*   obj = createText(parent, text);
     lv_obj_t*   sw = lv_switch_create(obj);
 
@@ -772,9 +772,59 @@ void LvSettingsScreen::createSwitch(lv_obj_t* parent, const char* text, bool* va
     lv_obj_add_style(sw, LvTheme::styleSwitchIndicatorChecked(), LV_PART_INDICATOR | LV_STATE_CHECKED);
     lv_obj_add_style(sw, LvTheme::styleSwitchKnobChecked(), LV_PART_KNOB | LV_STATE_CHECKED);
 
-    if (*val) {
+    lv_obj_add_event_cb(sw, [](lv_event_t * e) {
+        lv_obj_t*   target = lv_event_get_target(e);
+        BoolItem*   item = (BoolItem *) lv_event_get_user_data(e);
+        bool        data = lv_obj_has_state(target, LV_STATE_CHECKED);
+
+        *item->data = data;
+
+        if (item->update) {
+            item->update(data);
+        }
+    }, LV_EVENT_VALUE_CHANGED, new BoolItem(item));
+
+    if (*item.data) {
         lv_obj_add_state(sw, LV_STATE_CHECKED);
     }
+}
+
+void LvSettingsScreen::createSlider(lv_obj_t* parent, const char* text, Int32Item item) {
+    lv_obj_t*   obj = createText(parent, text);
+    lv_obj_t*   sl = lv_slider_create(obj);
+
+    lv_obj_add_style(sl, LvTheme::styleSlider(), LV_PART_MAIN);
+    lv_obj_add_style(sl, LvTheme::styleSliderIndicator(), LV_PART_INDICATOR);
+    lv_obj_add_style(sl, LvTheme::styleSliderKnob(), LV_PART_KNOB);
+
+    lv_slider_set_value(sl, *item.data, LV_ANIM_OFF);
+    lv_slider_set_range(sl, item.min, item.max);
+
+    lv_obj_t*   label = lv_label_create(sl);
+
+    lv_label_set_text_fmt(label, "%d", *item.data);
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
+
+    lv_obj_set_style_text_font(label, &lv_font_ratdeck_10, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(Theme::TEXT_PRIMARY), 0);
+
+    lv_obj_set_user_data(sl, label);
+
+    lv_obj_add_event_cb(sl, [](lv_event_t * e) {
+        lv_obj_t*   target = lv_event_get_target(e);
+        Int32Item*  item = (Int32Item *) lv_event_get_user_data(e);
+        int32_t     data = lv_slider_get_value(target);
+        lv_obj_t*   label = (lv_obj_t *) lv_obj_get_user_data(target);
+
+        *item->data = data;
+
+        if (item->update) {
+            item->update(data);
+        }
+
+        lv_label_set_text_fmt(label, "%d", data);
+        lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
+    }, LV_EVENT_VALUE_CHANGED, new Int32Item(item));
 }
 
 void LvSettingsScreen::pageDevice() {
@@ -807,7 +857,21 @@ void LvSettingsScreen::pageAudio() {
     lv_obj_t*   cont = subPage("Audio");
     auto&       s = _cfg->settings();
 
-    createSwitch(cont, "Enabled", &s.audioEnabled);
+    createSwitch(cont, "Enabled", {
+        &s.audioEnabled,
+        [this](bool v) {
+            _audio->setEnabled(v);
+            _ui->lvStatusBar().showToast("Saved", 800);
+        }
+    });
+
+    createSlider(cont, "Volume", {
+        &s.audioVolume, 0, 100,
+        [this](int32_t v) {
+            _audio->setVolume(v);
+            _ui->lvStatusBar().showToast("Saved", 800);
+        }
+    });
 }
 
 void LvSettingsScreen::pageInfo() {

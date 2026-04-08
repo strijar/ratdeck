@@ -65,7 +65,7 @@ struct UserSettings {
 
     // Audio
     bool audioEnabled = true;
-    uint8_t audioVolume = 80;  // 0-100
+    int32_t audioVolume = 80;  // 0-100
 
     // Identity
     String displayName;

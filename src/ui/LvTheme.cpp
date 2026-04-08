@@ -19,7 +19,6 @@ static lv_style_t s_list;
 static lv_style_t s_listBtn;
 static lv_style_t s_listBtnFocused;
 static lv_style_t s_dropdown;
-static lv_style_t s_slider;
 
 // New styles (6)
 static lv_style_t s_btnFocused;
@@ -34,6 +33,10 @@ static lv_style_t s_switchIndicator;
 static lv_style_t s_switchIndicatorChecked;
 static lv_style_t s_switchKnob;
 static lv_style_t s_switchKnobChecked;
+
+static lv_style_t s_slider;
+static lv_style_t s_sliderIndicator;
+static lv_style_t s_sliderKnob;
 
 void init(lv_disp_t* disp) {
     // Screen background (LV_USE_THEME_DEFAULT is disabled in lv_conf.h,
@@ -60,6 +63,7 @@ void init(lv_disp_t* disp) {
     lv_style_set_bg_opa(&s_btn, LV_OPA_COVER);
     lv_style_set_border_color(&s_btn, lv_color_hex(Theme::BORDER));
     lv_style_set_border_width(&s_btn, 1);
+    lv_style_set_text_font(&s_btn, &lv_font_ratdeck_10);
     lv_style_set_text_color(&s_btn, lv_color_hex(Theme::TEXT_PRIMARY));
     lv_style_set_radius(&s_btn, 4);
     lv_style_set_pad_all(&s_btn, 8);
@@ -138,12 +142,6 @@ void init(lv_disp_t* disp) {
     lv_style_set_radius(&s_dropdown, 4);
     lv_style_set_pad_all(&s_dropdown, 4);
 
-    // Slider
-    lv_style_init(&s_slider);
-    lv_style_set_bg_color(&s_slider, lv_color_hex(Theme::BORDER));
-    lv_style_set_bg_opa(&s_slider, LV_OPA_COVER);
-    lv_style_set_radius(&s_slider, 3);
-
     // Section header (for list section dividers like "Contacts (3)")
     lv_style_init(&s_sectionHeader);
     lv_style_set_bg_opa(&s_sectionHeader, LV_OPA_TRANSP);
@@ -187,24 +185,42 @@ void init(lv_disp_t* disp) {
     lv_style_set_border_width(&s_roller, 0);
 
     // Switch
-
     lv_style_init(&s_switch);
-    lv_style_set_max_height(&s_switch, 14);
-    lv_style_set_max_width(&s_switch, 14 * 2);
-    lv_style_set_pad_all(&s_switch, 1);
+    lv_style_set_width(&s_switch, 80);
+    lv_style_set_height(&s_switch, 14);
+    lv_style_set_pad_hor(&s_switch, 0);
     lv_style_set_bg_color(&s_switch, lv_color_hex(Theme::BORDER));
     lv_style_set_bg_opa(&s_switch, LV_OPA_COVER);
     lv_style_set_radius(&s_switch, LV_RADIUS_CIRCLE);
 
     lv_style_init(&s_switchIndicator);
+
     lv_style_init(&s_switchIndicatorChecked);
 
     lv_style_init(&s_switchKnob);
     lv_style_set_bg_color(&s_switchKnob, lv_color_hex(Theme::PRIMARY));
     lv_style_set_bg_opa(&s_switchKnob, LV_OPA_COVER);
     lv_style_set_radius(&s_switchKnob, LV_RADIUS_CIRCLE);
+    lv_style_set_pad_all(&s_switchKnob, -1);
 
     lv_style_init(&s_switchKnobChecked);
+
+    // Slider
+    lv_style_init(&s_slider);
+    lv_style_set_width(&s_slider, 80);
+    lv_style_set_height(&s_slider, 14);
+    lv_style_set_pad_hor(&s_slider, 7);
+    lv_style_set_bg_color(&s_slider, lv_color_hex(Theme::BORDER));
+    lv_style_set_bg_opa(&s_slider, LV_OPA_COVER);
+    lv_style_set_radius(&s_slider, LV_RADIUS_CIRCLE);
+
+    lv_style_init(&s_sliderIndicator);
+
+    lv_style_init(&s_sliderKnob);
+    lv_style_set_bg_color(&s_sliderKnob, lv_color_hex(Theme::PRIMARY));
+    lv_style_set_bg_opa(&s_sliderKnob, LV_OPA_COVER);
+    lv_style_set_radius(&s_sliderKnob, LV_RADIUS_CIRCLE);
+    lv_style_set_pad_all(&s_switchKnob, -1);
 
     // Apply screen style to default theme
     lv_obj_add_style(lv_scr_act(), &s_screen, 0);
@@ -226,7 +242,6 @@ lv_style_t* styleList()             { return &s_list; }
 lv_style_t* styleListBtn()          { return &s_listBtn; }
 lv_style_t* styleListBtnFocused()   { return &s_listBtnFocused; }
 lv_style_t* styleDropdown()         { return &s_dropdown; }
-lv_style_t* styleSlider()           { return &s_slider; }
 
 // New accessors (6)
 lv_style_t* styleBtnFocused()       { return &s_btnFocused; }
@@ -241,5 +256,9 @@ lv_style_t* styleSwitchIndicator()          { return &s_switchIndicator; }
 lv_style_t* styleSwitchIndicatorChecked()   { return &s_switchIndicatorChecked; }
 lv_style_t* styleSwitchKnob()               { return &s_switchKnob; }
 lv_style_t* styleSwitchKnobChecked()        { return &s_switchKnobChecked; }
+
+lv_style_t* styleSlider()                   { return &s_slider; }
+lv_style_t* styleSliderIndicator()          { return &s_sliderIndicator; }
+lv_style_t* styleSliderKnob()               { return &s_sliderKnob; }
 
 }  // namespace LvTheme
