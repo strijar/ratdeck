@@ -2,7 +2,6 @@
 
 volatile int8_t Trackball::_deltaX = 0;
 volatile int8_t Trackball::_deltaY = 0;
-volatile bool Trackball::_clickFlag = false;
 Trackball* Trackball::_instance = nullptr;
 
 bool Trackball::begin() {
@@ -13,46 +12,77 @@ bool Trackball::begin() {
     pinMode(TBALL_DOWN, INPUT_PULLUP);
     pinMode(TBALL_LEFT, INPUT_PULLUP);
     pinMode(TBALL_RIGHT, INPUT_PULLUP);
-    pinMode(TBALL_CLICK, INPUT_PULLUP);
 
     // Attach interrupts for movement detection
     attachInterrupt(digitalPinToInterrupt(TBALL_UP), isrUp, FALLING);
     attachInterrupt(digitalPinToInterrupt(TBALL_DOWN), isrRight, FALLING);   // Physical down pin = rightward
     attachInterrupt(digitalPinToInterrupt(TBALL_LEFT), isrLeft, FALLING);
     attachInterrupt(digitalPinToInterrupt(TBALL_RIGHT), isrDown, FALLING);   // Physical right pin = downward
-    attachInterrupt(digitalPinToInterrupt(TBALL_CLICK), isrClick, FALLING);
 
     Serial.println("[TRACKBALL] Initialized");
     return true;
 }
 
-void Trackball::update() {
+bool Trackball::isPressed() {
+    return (digitalRead(TBALL_CLICK) == LOW);
+}
+
+bool Trackball::movedLeft() {
+    bool res = false;
+
     noInterrupts();
-    int8_t dx = _deltaX;
-    int8_t dy = _deltaY;
-    bool click = _clickFlag;
-    _deltaX = 0;
-    _deltaY = 0;
-    _clickFlag = false;
+    if (_deltaX < -_speed) {
+        _deltaX += _speed;
+        res = true;
+    }
     interrupts();
 
-    _lastDX = dx;
-    _lastDY = dy;
+    return res;
+}
 
-    _cursorX += dx * _speed;
-    _cursorY += dy * _speed;
+bool Trackball::movedRight() {
+    bool res = false;
 
-    if (_cursorX < 0) _cursorX = 0;
-    if (_cursorX >= TFT_WIDTH) _cursorX = TFT_WIDTH - 1;
-    if (_cursorY < 0) _cursorY = 0;
-    if (_cursorY >= TFT_HEIGHT) _cursorY = TFT_HEIGHT - 1;
+    noInterrupts();
+    if (_deltaX > _speed) {
+        _deltaX -= _speed;
+        res = true;
+    }
+    interrupts();
 
-    _clicked = click;
-    _hadMovement = (dx != 0 || dy != 0);
+    return res;
+}
+
+bool Trackball::movedUp() {
+    bool res = false;
+
+    noInterrupts();
+    if (_deltaY < -_speed) {
+        _deltaY += _speed;
+        res = true;
+    }
+    interrupts();
+
+    return res;
+}
+
+bool Trackball::movedDown() {
+    bool res = false;
+
+    noInterrupts();
+    if (_deltaY > _speed) {
+        _deltaY -= _speed;
+        res = true;
+    }
+    interrupts();
+
+    return res;
+}
+
+void Trackball::update() {
 }
 
 void IRAM_ATTR Trackball::isrUp()    { _deltaY--; }
 void IRAM_ATTR Trackball::isrDown()  { _deltaY++; }
 void IRAM_ATTR Trackball::isrLeft()  { _deltaX--; }
 void IRAM_ATTR Trackball::isrRight() { _deltaX++; }
-void IRAM_ATTR Trackball::isrClick() { _clickFlag = true; }

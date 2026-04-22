@@ -167,6 +167,27 @@ static void keypad_read_cb(lv_indev_drv_t* drv, lv_indev_data_t* data) {
     }
 }
 
+static void trackball_read_cb(lv_indev_drv_t* drv, lv_indev_data_t* data) {
+    if (s_tb->isPressed()) {
+        data->key = LV_KEY_ENTER;
+        data->state = LV_INDEV_STATE_PRESSED;
+    } else if (s_tb->movedLeft()) {
+        data->key = LV_KEY_LEFT;
+        data->state = LV_INDEV_STATE_PRESSED;
+    } else if (s_tb->movedRight()) {
+        data->key = LV_KEY_RIGHT;
+        data->state = LV_INDEV_STATE_PRESSED;
+    } else if (s_tb->movedUp()) {
+        data->key = LV_KEY_UP;
+        data->state = LV_INDEV_STATE_PRESSED;
+    } else if (s_tb->movedDown()) {
+        data->key = LV_KEY_DOWN;
+        data->state = LV_INDEV_STATE_PRESSED;
+    } else {
+        data->state = LV_INDEV_STATE_RELEASED;
+    }
+}
+
 void init(Keyboard* kb, Trackball* tb, TouchInput* touch) {
     s_kb = kb;
     s_tb = tb;
@@ -211,6 +232,14 @@ void init(Keyboard* kb, Trackball* tb, TouchInput* touch) {
     lv_obj_set_style_translate_y(s_cursor, -7, 0);
     lv_indev_set_cursor(touchIndev, s_cursor);
     lv_obj_add_flag(s_cursor, LV_OBJ_FLAG_HIDDEN);
+
+    // Register trackbol indev
+    static lv_indev_drv_t tbDrv;
+    lv_indev_drv_init(&tbDrv);
+    tbDrv.type = LV_INDEV_TYPE_KEYPAD;
+    tbDrv.read_cb = trackball_read_cb;
+    lv_indev_t* tbIndev = lv_indev_drv_register(&tbDrv);
+    lv_indev_set_group(tbIndev, s_group);
 
     Serial.println("[LVGL] Input drivers registered (touch enabled)");
 }
